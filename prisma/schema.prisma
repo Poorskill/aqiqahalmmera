@@ -1,0 +1,173 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  phone      String
+  role       String   @default("customer") // customer, admin, kandang, dapur, driver
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders     Order[]
+  quotations Quotation[]
+  reviews    Review[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Order {
+  id                String         @id @default(uuid())
+  invoiceNo         String         @unique // Manual or generated customer invoice
+  vendorInvoiceNo   String         @unique // INV-YYYYMMDD-XXXX
+  customerId        String
+  customer          User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderDate         DateTime       @default(now())
+  jenisOrder        String         @default("aqiqah") // aqiqah, nazar, tasyakuran, catering, lainnya
+  atasNama          String
+  status            String         @default("waiting_review") // waiting_review, quotation_sent, quotation_approved, preparing, slaughtering, cooking, packaging, delivery, completed, cancelled
+  quotationPrice    Float?
+  approvedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  orderDetails      OrderDetail?
+  quotation         Quotation?
+  review            Review?
+  kandangOrder      KandangOrder?
+  dapurOrder        DapurOrder?
+  adminOrder        AdminOrder?
+  driverOrder       DriverOrder?
+
+  @@index([customerId])
+  @@index([status])
+  @@index([orderDate])
+  @@index([vendorInvoiceNo])
+}
+
+model OrderDetail {
+  id                 String   @id @default(uuid())
+  orderId            String   @unique
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Parent / Child info
+  parentName         String
+  childName          String
+  
+  // Delivery info
+  recipientName      String
+  address            String
+  deliveryDate       String
+  deliveryTime       String
+  phone              String
+  driverInfo         String?
+  driverFee          Float?   @default(0)
+
+  // Pesanan (Animal & Kitchens)
+  animalOrder        String   // Pesanan Kambing / Domba
+  kandangNote        String?
+  dapurAMasakan      String?  // Masakan Kambing Dapur A
+  dapurANasiBox      String?  // Nasi Box Dapur A
+  dapurANote         String?
+  dapurRMasakan      String?  // Masakan Kambing Dapur R
+  dapurRNasiBox      String?  // Nasi Box Dapur R
+  dapurRNote         String?
+
+  // Rincian Biaya
+  paymentStatus      String   @default("dp") // lunas, dp, kurang
+  totalPelunasan     Float    @default(0)
+  totalBayar         Float    @default(0)
+
+  createdAt          DateTime @default(now())
+}
+
+model Quotation {
+  id         String   @id @default(uuid())
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  adminId    String
+  admin      User     @relation(fields: [adminId], references: [id])
+  price      Float
+  note       String?
+  status     String   @default("pending") // pending, approved, rejected
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rating     Int      // 1 to 5
+  comment    String
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+  @@index([customerId])
+}
+
+model KandangOrder {
+  id                String   @id @default(uuid())
+  orderId           String   @unique
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  animalType        String
+  animalQty         Int
+  slaughterSchedule String
+  notes             String?
+  prepStatus        String   @default("pending") // pending, ready, slaughtered
+  createdAt         DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model DapurOrder {
+  id              String   @id @default(uuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menu            String
+  portion         String
+  cookingSchedule String
+  notes           String?
+  kitchenStatus   String   @default("waiting_cook") // waiting_cook, cooking, packed
+  createdAt       DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model AdminOrder {
+  id              String   @id @default(uuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  statusTerkini   String   @default("monitoring")
+  monitoringNotes String?
+  receivedAt      DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model DriverOrder {
+  id               String   @id @default(uuid())
+  orderId          String   @unique
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deliveryAddress  String
+  contactPerson    String
+  deliverySchedule String
+  status           String   @default("assigned") // assigned, on_delivery, delivered
+  receivedAt       DateTime @default(now())
+
+  @@index([orderId])
+}

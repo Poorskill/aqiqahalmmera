@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #865300;
+    --primary-container: #d97706;
+    --secondary: #57534e;
+    --surface: #faf9f6;
+    --surface-card: #ffffff;
+    --text-main: #2c1609;
+    --error: #dc2626;
+  }
+
+  body {
+    background-color: var(--surface);
+    color: var(--text-main);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+/* Official Aqiqah Almeera Design System (DESIGN.MD Source of Truth) */
+.almeera-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(131, 83, 0, 0.1);
+  box-shadow: 0 4px 20px -2px rgba(44, 22, 9, 0.04);
+  border-radius: 1rem;
+}
+
+.almeera-card-lg {
+  background-color: #ffffff;
+  border: 1px solid rgba(131, 83, 0, 0.12);
+  box-shadow: 0 10px 30px -4px rgba(44, 22, 9, 0.06);
+  border-radius: 1.25rem;
+}
+
+.almeera-btn {
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background-color: #d97706;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
+}
+
+.almeera-btn:hover {
+  background-color: #b45309;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.25);
+}
+
+.almeera-btn:active {
+  transform: translateY(0px);
+}
+
+.almeera-input {
+  border: 1px solid #e7e5e4;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.75rem 1rem;
+  outline: none;
+  transition: all 0.2s ease;
+  color: #2c1609;
+}
+
+.almeera-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+
+/* Backwards compatibility aliases mapped strictly to official Design System */
+.brutalist-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(131, 83, 0, 0.1);
+  box-shadow: 0 4px 20px -2px rgba(44, 22, 9, 0.04);
+  border-radius: 1rem !important;
+}
+
+.brutalist-card-lg {
+  background-color: #ffffff;
+  border: 1px solid rgba(131, 83, 0, 0.12);
+  box-shadow: 0 10px 30px -4px rgba(44, 22, 9, 0.06);
+  border-radius: 1.25rem !important;
+}
+
+.brutalist-btn {
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2) !important;
+  border: none !important;
+}
+
+.brutalist-btn:hover {
+  background-color: #b45309 !important;
+  transform: translateY(-1px);
+}
+
+.brutalist-btn:active {
+  transform: translateY(0px);
+}
+
+.brutalist-input {
+  border: 1px solid #e7e5e4 !important;
+  border-radius: 0.75rem !important;
+  background: white !important;
+  padding: 0.75rem 1rem !important;
+  outline: none;
+  color: #2c1609 !important;
+}
+
+.brutalist-input:focus {
+  border-color: #d97706 !important;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12) !important;
+}

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 280" width="100%" height="100%">
+  <defs>
+    <style>
+      .brand-name {
+        font-family: 'Montserrat', 'Quicksand', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+        font-weight: 900;
+        font-size: 56px;
+        fill: #3e2717;
+        letter-spacing: -0.5px;
+        text-anchor: middle;
+      }
+      .brand-tagline {
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        fill: #705342;
+        letter-spacing: 2.5px;
+        text-anchor: middle;
+      }
+    </style>
+  </defs>
+
+  <!-- Icon Mark (Centered at X: 220, Y: 10 to 150) -->
+  <g transform="translate(130, 5)">
+    <!-- Crescent Moon (Golden Orange) -->
+    <path d="M 90 15 
+             C 45 15, 10 50, 10 95 
+             C 10 140, 45 175, 90 175 
+             C 115 175, 135 165, 150 150 
+             C 120 155, 95 140, 95 105 
+             C 95 70, 120 50, 150 40 
+             C 135 25, 115 15, 90 15 Z" 
+          fill="#f39c0d" />
+
+    <!-- Sun / Dot on Top Right -->
+    <circle cx="152" cy="22" r="10" fill="#f39c0d" />
+
+    <!-- Goat / Ram Silhouette (Rich Brown) -->
+    <path d="M 60 115 
+             C 52 110, 45 98, 48 90 
+             C 50 85, 55 82, 60 85 
+             C 65 78, 75 70, 85 72 
+             C 95 74, 110 80, 125 90 
+             C 130 93, 135 95, 142 98 
+             C 130 115, 115 130, 95 142 
+             C 85 140, 75 130, 68 125 
+             C 64 122, 62 118, 60 115 Z" 
+          fill="#5c3a21" />
+
+    <!-- Goat Horn (Curved) -->
+    <path d="M 118 92 
+             C 135 85, 155 95, 158 112 
+             C 160 122, 152 135, 138 140" 
+          fill="none" stroke="#5c3a21" stroke-width="7" stroke-linecap="round" />
+
+    <!-- ® Symbol -->
+    <g transform="translate(162, 138)">
+      <circle cx="10" cy="10" r="9" fill="none" stroke="#705342" stroke-width="2.5" />
+      <text x="10" y="15" font-family="sans-serif" font-weight="bold" font-size="11" fill="#705342" text-anchor="middle">R</text>
+    </g>
+  </g>
+
+  <!-- Typography: almeera -->
+  <text x="220" y="222" class="brand-name">almeera</text>
+
+  <!-- Typography: Aqiqah - Catering - Kambing Guling -->
+  <text x="220" y="255" class="brand-tagline">Aqiqah - Catering - Kambing Guling</text>
+</svg>
