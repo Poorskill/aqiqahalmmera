@@ -74,7 +74,7 @@ export function createUser(data: { name: string; email: string; password: string
 // Order Services
 export function generateVendorInvoiceNo(): string {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const countStmt = db.prepare('SELECT COUNT(*) as count FROM orders WHERE vendorInvoiceNo LIKE ?');
+  const countStmt = db.prepare('SELECT COUNT(*) AS [count] FROM orders WHERE vendorInvoiceNo LIKE ?');
   const res = countStmt.get(`INV-${dateStr}-%`) as { count: number };
   const seq = String(res.count + 1).padStart(4, '0');
   return `INV-${dateStr}-${seq}`;
@@ -83,7 +83,7 @@ export function generateVendorInvoiceNo(): string {
 export function getSlotOccupancy(deliveryDate: string, deliveryTime: string): number {
   try {
     const stmt = db.prepare(`
-      SELECT COUNT(*) as count FROM orders o
+      SELECT COUNT(*) AS [count] FROM orders o
       JOIN order_details od ON o.id = od.orderId
       WHERE od.deliveryDate = ? AND od.deliveryTime = ? AND o.status != 'cancelled'
     `);
@@ -109,7 +109,7 @@ export function getSlotCapacitiesForDate(deliveryDate: string): Record<string, n
 export function getSlotOccupancyExcludingOrder(deliveryDate: string, deliveryTime: string, excludeOrderId: string): number {
   try {
     const stmt = db.prepare(`
-      SELECT COUNT(*) as count FROM orders o
+      SELECT COUNT(*) AS [count] FROM orders o
       JOIN order_details od ON o.id = od.orderId
       WHERE od.deliveryDate = ? AND od.deliveryTime = ? AND o.status != 'cancelled' AND o.id != ?
     `);
@@ -1262,7 +1262,7 @@ export function getNotificationsByUserId(userId: string) {
 }
 
 export function getUnreadNotificationCount(userId: string): number {
-  const stmt = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE userId = ? AND readAt IS NULL');
+  const stmt = db.prepare('SELECT COUNT(*) AS [count] FROM notifications WHERE userId = ? AND readAt IS NULL');
   const res = stmt.get(userId) as { count: number };
   return res.count || 0;
 }

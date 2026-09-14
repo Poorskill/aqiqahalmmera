@@ -52,6 +52,7 @@ function sanitize(sql: string): string {
   return sql
     .replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO')
     .replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO')
+    .replace(/\bAS\s+count\b/gi, 'AS [count]')
     .replace(/PRAGMA\s+[^;]+;?/gi, '')
     .replace(/AUTOINCREMENT/gi, '')
     .replace(/COLLATE\s+\w+/gi, '');
