@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { getUserById, getUserByEmail, User } from './services';
+import { getUserById, User } from './services';
 
 const SESSION_COOKIE_NAME = 'almeera_session';
 
@@ -25,7 +25,9 @@ export async function getCurrentUser(): Promise<User | null> {
     const userId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (!userId) return null;
     const user = getUserById(userId);
-    return user || null;
+    if (!user) return null;
+    if (user.status && user.status !== 'active') return null;
+    return user;
   } catch {
     return null;
   }
@@ -35,6 +37,9 @@ export async function requireAuth(allowedRoles?: string[]) {
   const user = await getCurrentUser();
   if (!user) {
     throw new Error('Unauthorized: Silakan login terlebih dahulu.');
+  }
+  if (user.status && user.status !== 'active') {
+    throw new Error('Forbidden: Akun Anda dinonaktifkan.');
   }
   if (user.role === 'master_admin') {
     return user;

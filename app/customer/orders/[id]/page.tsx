@@ -15,7 +15,7 @@ export default async function CustomerOrderDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; success?: string }>;
 }) {
-  const user = await requireAuth();
+  const user = await requireAuth(['customer', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
   const order = getOrderById(id);
@@ -77,44 +77,27 @@ export default async function CustomerOrderDetailPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {user.role === 'admin' && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Link
-                    href={`/documents/orders/${order.id}/kandang`}
-                    target="_blank"
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">print</span>
-                    PO Kandang
-                  </Link>
-                  <Link
-                    href={`/documents/orders/${order.id}/dapur-a`}
-                    target="_blank"
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">print</span>
-                    PO Dapur A
-                  </Link>
-                  <Link
-                    href={`/documents/orders/${order.id}/dapur-r`}
-                    target="_blank"
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">print</span>
-                    PO Dapur R
-                  </Link>
-                  <Link
-                    href={`/documents/orders/${order.id}/driver`}
-                    target="_blank"
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">print</span>
-                    PO Driver
-                  </Link>
-                </div>
+              {user.role === 'master_admin' && (
+                <Link
+                  href={`/admin/orders/${order.id}/edit`}
+                  className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">edit</span>
+                  Edit Pesanan
+                </Link>
+              )}
+              {['admin', 'master_admin'].includes(user.role) && (
+                <Link
+                  href={`/documents/orders/${order.id}/lengkap`}
+                  target="_blank"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">print</span>
+                  PO Lengkap
+                </Link>
               )}
               <Link
-                href={user.role === 'admin' ? '/admin/orders' : '/customer/orders'}
+                href={['admin', 'master_admin'].includes(user.role) ? '/admin/orders' : '/customer/orders'}
                 className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold transition-all"
               >
                 ← Kembali
@@ -161,37 +144,109 @@ export default async function CustomerOrderDetailPage({
             </div>
           )}
 
-          {/* Admin Quotation Creator if waiting_review */}
-          {user.role === 'admin' && order.status === 'waiting_review' && (
-            <div className="bg-amber-50 border border-amber-300 rounded-2xl p-6 space-y-4 shadow-sm">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-900">Buat & Kirim Penawaran Harga</h4>
-              <form action={`/api/orders/${order.id}/quotation`} method="POST" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Admin Quotation Creator & Operational Notes */}
+          {['admin', 'master_admin'].includes(user.role) && ['waiting_review', 'quotation_sent', 'quotation_approved'].includes(order.status) && (
+            <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-6 space-y-6 shadow-sm">
+              <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                  {order.status === 'waiting_review' ? 'Buat & Kirim Penawaran Harga & Pesan Operasional' : 'Ubah Penawaran Harga & Pesan Operasional'}
+                </h4>
+                <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                  Quotation & Internal Ops
+                </span>
+              </div>
+
+              <form action={`/api/orders/${order.id}/quotation`} method="POST" className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-900 mb-1.5">Harga Penawaran (Rp) *</label>
+                    <input
+                      type="number"
+                      name="price"
+                      required
+                      defaultValue={order.quotation?.price || order.quotationPrice || order.orderDetails?.totalPelunasan || 2500000}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-900 mb-1.5">Uang Saku Driver (Rp) (Internal)</label>
+                    <input
+                      type="number"
+                      name="uangSakuDriver"
+                      defaultValue={order.orderDetails?.uangSakuDriver || 50000}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-amber-900 mb-1">Harga Penawaran (Rp)</label>
+                  <label className="block text-xs font-semibold text-amber-900 mb-1.5">Catatan / Rincian Penawaran</label>
                   <input
-                    type="number"
-                    name="price"
-                    required
-                    defaultValue={order.orderDetails?.totalPelunasan || 2500000}
+                    type="text"
+                    name="note"
+                    defaultValue={order.quotation?.note || ''}
+                    placeholder="Contoh: Termasuk bonus sate 50 tusuk dan ongkir Cilacap."
                     className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold text-amber-900 mb-1">Catatan / Rincian Penawaran</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      name="note"
-                      placeholder="Contoh: Termasuk bonus sate 50 tusuk dan ongkir Cilacap."
-                      className="w-full bg-white border border-amber-300 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                    />
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shrink-0 shadow-sm transition-all"
-                    >
-                      Kirim Penawaran
-                    </button>
+
+                <div className="space-y-4 pt-4 border-t border-amber-200/60">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                    Pesan Operasional (Internal Tim)
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-amber-900 mb-1">Pesan untuk Kandang (Opsional)</label>
+                      <textarea
+                        name="pesanKandang"
+                        rows={2}
+                        defaultValue={order.orderDetails?.pesanKandang || ''}
+                        placeholder="Contoh: Pastikan kepala dan kaki ikut dikirim."
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-amber-900 mb-1">Pesan untuk Dapur A (Opsional)</label>
+                      <textarea
+                        name="pesanDapurA"
+                        rows={2}
+                        defaultValue={order.orderDetails?.pesanDapurA || ''}
+                        placeholder="Contoh: Pisahkan sambal dan gunakan tingkat kepedasan sedang."
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-amber-900 mb-1">Pesan untuk Dapur R (Opsional)</label>
+                      <textarea
+                        name="pesanDapurR"
+                        rows={2}
+                        defaultValue={order.orderDetails?.pesanDapurR || ''}
+                        placeholder="Contoh: Menu tambahan dikemas terpisah."
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-amber-900 mb-1">Pesan untuk Driver (Opsional)</label>
+                      <textarea
+                        name="pesanDriver"
+                        rows={2}
+                        defaultValue={order.orderDetails?.pesanDriver || ''}
+                        placeholder="Contoh: Hubungi penerima 30 menit sebelum sampai."
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      ></textarea>
+                    </div>
                   </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm transition-all"
+                  >
+                    <span className="material-symbols-outlined text-base">send</span>
+                    <span>Kirim Penawaran & Simpan Pesan Operasional</span>
+                  </button>
                 </div>
               </form>
             </div>
@@ -438,9 +493,10 @@ export default async function CustomerOrderDetailPage({
                 Informasi Shohibul & Pengiriman
               </h4>
               <div className="space-y-2 text-xs text-stone-700">
-                <p><strong className="text-stone-900">Nama Pemesan:</strong> {order.customer?.name}</p>
+                <p><strong className="text-stone-900">Nama Pemesan:</strong> {order.atasNama}</p>
                 <p><strong className="text-stone-900">No HP / WhatsApp:</strong> {order.orderDetails?.phone}</p>
-                <p><strong className="text-stone-900">Nama Ayah/Ibu:</strong> {order.orderDetails?.parentName}</p>
+                <p><strong className="text-stone-900">Nama Ayah:</strong> {order.orderDetails?.fatherName || order.orderDetails?.parentName?.split('&')[0]?.trim() || '-'}</p>
+                <p><strong className="text-stone-900">Nama Ibu:</strong> {order.orderDetails?.motherName || order.orderDetails?.parentName?.split('&')[1]?.trim() || '-'}</p>
                 <p><strong className="text-stone-900">Nama Anak:</strong> {order.orderDetails?.childName}</p>
                 <p><strong className="text-stone-900">Penerima Tujuan:</strong> {order.orderDetails?.recipientName}</p>
                 <p><strong className="text-stone-900">Alamat Pengiriman:</strong> {order.orderDetails?.address}</p>
@@ -454,21 +510,100 @@ export default async function CustomerOrderDetailPage({
             {/* Pesanan & Biaya */}
             <div className="bg-white border border-stone-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-800 border-b border-stone-100 pb-3">
-                Rincian Pesanan & Menu
+                Rincian Pesanan & Menu ({order.items?.length || 1} Item)
               </h4>
-              <div className="space-y-2 text-xs text-stone-700">
+              <div className="space-y-4 text-xs text-stone-700">
                 <p><strong className="text-stone-900">Jenis Order:</strong> <span className="uppercase font-semibold">{order.jenisOrder}</span></p>
-                <p><strong className="text-stone-900">Pesanan Kambing:</strong> {order.orderDetails?.animalOrder}</p>
-                {order.orderDetails?.kandangNote && (
-                  <p><strong className="text-stone-900">Catatan Kandang:</strong> {order.orderDetails.kandangNote}</p>
+                {order.items && order.items.length > 0 ? (
+                  order.items.map((it: any, idx: number) => (
+                    <div key={idx} className="p-3 bg-stone-50 border border-stone-200 rounded-xl space-y-1.5">
+                      <p className="font-bold text-amber-900 uppercase">Pesanan {idx + 1}</p>
+                      <p><strong className="text-stone-900">Pesanan Kambing:</strong> {it.animalOrder}</p>
+                      {it.kandangNote && <p><strong className="text-stone-900">Catatan Kandang:</strong> {it.kandangNote}</p>}
+                      <p><strong className="text-stone-900">Masakan Dapur A:</strong> {it.dapurAMasakan || '-'}</p>
+                      <p><strong className="text-stone-900">Nasi Box Dapur A:</strong> {it.dapurANasiBox || '-'}</p>
+                      {it.dapurANote && <p><strong className="text-stone-900">Catatan Dapur A:</strong> {it.dapurANote}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <p><strong className="text-stone-900">Pesanan Kambing:</strong> {order.orderDetails?.animalOrder}</p>
+                    {order.orderDetails?.kandangNote && (
+                      <p><strong className="text-stone-900">Catatan Kandang:</strong> {order.orderDetails.kandangNote}</p>
+                    )}
+                    <p><strong className="text-stone-900">Masakan Dapur A:</strong> {order.orderDetails?.dapurAMasakan || '-'}</p>
+                    <p><strong className="text-stone-900">Nasi Box Dapur A:</strong> {order.orderDetails?.dapurANasiBox || '-'}</p>
+                  </>
                 )}
-                <p><strong className="text-stone-900">Masakan Dapur A:</strong> {order.orderDetails?.dapurAMasakan || '-'}</p>
-                <p><strong className="text-stone-900">Nasi Box Dapur A:</strong> {order.orderDetails?.dapurANasiBox || '-'}</p>
+                {order.orderDetails?.pesananLainnya && (
+                  <div className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-xl space-y-1">
+                    <p className="font-bold text-amber-950 uppercase">Pesanan Lainnya</p>
+                    <p className="text-stone-800">{order.orderDetails.pesananLainnya}</p>
+                  </div>
+                )}
                 <hr className="border-stone-100 my-2" />
                 <p><strong className="text-stone-900">Status Pembayaran:</strong> <span className="uppercase font-bold text-amber-900">{order.orderDetails?.paymentStatus}</span></p>
               </div>
             </div>
           </div>
+
+          {/* Delivery Tracking & Proof Section */}
+          {order.driverOrder && ['delivery', 'completed'].includes(order.status) && (
+            <div className={`border rounded-2xl p-6 space-y-4 shadow-sm ${
+              order.driverOrder.status === 'delivered' ? 'bg-emerald-50/70 border-emerald-300' : 'bg-blue-50/70 border-blue-300'
+            }`}>
+              <div className="flex items-center justify-between border-b border-stone-200/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className={`material-symbols-outlined ${order.driverOrder.status === 'delivered' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                    {order.driverOrder.status === 'delivered' ? 'check_circle' : 'local_shipping'}
+                  </span>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-900">
+                    Status Pengiriman Pesanan
+                  </h4>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase ${
+                  order.driverOrder.status === 'delivered' ? 'bg-emerald-100 text-emerald-900' : 'bg-blue-100 text-blue-900'
+                }`}>
+                  {order.driverOrder.status === 'delivered' ? 'Terkirim & Diterima' : 'Dalam Perjalanan'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-stone-700">
+                <div>
+                  <p><strong className="text-stone-900">Tujuan Pengiriman:</strong> {order.driverOrder.deliveryAddress}</p>
+                  <p className="mt-1"><strong className="text-stone-900">Penerima:</strong> {order.driverOrder.contactPerson}</p>
+                </div>
+                <div>
+                  {order.driverOrder.deliveredAt && (
+                    <p><strong className="text-stone-900">Waktu Diterima:</strong> {new Date(order.driverOrder.deliveredAt).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}</p>
+                  )}
+                  {['admin', 'master_admin'].includes(user.role) && order.driverOrder.arrivedAt && (
+                    <p className="mt-1"><strong className="text-stone-900">Waktu Tiba di Lokasi (Internal):</strong> {new Date(order.driverOrder.arrivedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                  )}
+                </div>
+              </div>
+
+              {order.driverOrder.deliveryProof && (
+                <div className="pt-2">
+                  <span className="text-xs font-semibold text-stone-900 block mb-1.5">Bukti Foto Penerimaan:</span>
+                  <a href={order.driverOrder.deliveryProof} target="_blank" rel="noopener noreferrer" className="inline-block">
+                    <img
+                      src={order.driverOrder.deliveryProof}
+                      alt="Bukti Penerimaan"
+                      className="w-48 h-36 object-cover rounded-xl border border-stone-300 hover:opacity-90 shadow-xs transition-opacity"
+                    />
+                  </a>
+                </div>
+              )}
+
+              {['admin', 'master_admin'].includes(user.role) && order.driverOrder.deliveryNote && (
+                <div className="p-3 bg-white border border-stone-200 rounded-xl space-y-1 text-xs">
+                  <span className="font-semibold text-stone-900">Catatan Driver (Internal):</span>
+                  <p className="text-stone-700">{order.driverOrder.deliveryNote}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Review section if completed */}
           {order.status === 'completed' && (

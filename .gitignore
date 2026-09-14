@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+opencode.json
 
 # debug
 npm-debug.log*
@@ -32,6 +33,15 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# sqlite runtime / temp files (never commit)
+*.db-shm
+*.db-wal
+*.db-journal
+# local runtime database & uploads (keep schema, not data)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+public/uploads/*
 
 # vercel
 .vercel

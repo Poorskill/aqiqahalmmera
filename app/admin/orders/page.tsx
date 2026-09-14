@@ -12,7 +12,7 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<{ search?: string; status?: string }>;
 }) {
-  const user = await requireAuth(['admin']);
+  const user = await requireAuth(['admin', 'master_admin']);
   const params = await searchParams;
   const orders = getAllOrders({ search: params.search, status: params.status });
 

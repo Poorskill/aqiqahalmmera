@@ -20,8 +20,14 @@ export async function POST(
     const notes = formData.get('notes') as string;
     let proof = formData.get('proof') as string;
 
-    const proofFile = formData.get('proofFile') as File;
+    const proofFile = formData.get('proofFile') as unknown as File | null;
     if (proofFile && proofFile.size > 0) {
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(proofFile.type)) {
+        return NextResponse.redirect(new URL(`/customer/orders/${orderId}?error=Format bukti tidak didukung (Gunakan JPG, PNG, WebP).`, request.url), { status: 303 });
+      }
+      if (proofFile.size > 5 * 1024 * 1024) {
+        return NextResponse.redirect(new URL(`/customer/orders/${orderId}?error=Ukuran bukti terlalu besar (Maks 5MB).`, request.url), { status: 303 });
+      }
       const bytes = await proofFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
       const uploadDir = path.join(process.cwd(), 'public', 'uploads');

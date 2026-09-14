@@ -7,7 +7,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 export default async function PoDriverPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAuth(['admin', 'driver']);
+  await requireAuth(['admin', 'master_admin', 'driver']);
   const { id } = await params;
   const order = getOrderById(id);
 

@@ -13,7 +13,7 @@ export default async function DapurOrderDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; success?: string }>;
 }) {
-  const user = await requireAuth(['dapur', 'admin']);
+  const user = await requireAuth(['dapur', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
   const order = getOrderById(id);
@@ -170,9 +170,27 @@ export default async function DapurOrderDetailPage({
                 <div className="space-y-1">
                   <p><strong className="text-[#775847]">Catatan Dapur:</strong></p>
                   <p className="p-3 bg-purple-50 border border-purple-300 text-xs font-medium text-purple-950">
-                    {dapur.notes || order.orderDetails?.dapurANote || 'Tidak ada catatan dapur.'}
+                    {dapur.notes || 'Tidak ada catatan dapur.'}
                   </p>
                 </div>
+
+                {order.orderDetails?.pesanDapurA && (
+                  <div className="space-y-1">
+                    <p><strong className="text-[#775847]">Pesan Khusus untuk Dapur A:</strong></p>
+                    <p className="p-3 bg-purple-100/70 border border-purple-600/40 rounded-xl text-xs font-bold text-purple-950">
+                      {order.orderDetails.pesanDapurA}
+                    </p>
+                  </div>
+                )}
+
+                {order.orderDetails?.pesanDapurR && (
+                  <div className="space-y-1">
+                    <p><strong className="text-[#775847]">Pesan Khusus untuk Dapur R:</strong></p>
+                    <p className="p-3 bg-purple-100/70 border border-purple-600/40 rounded-xl text-xs font-bold text-purple-950">
+                      {order.orderDetails.pesanDapurR}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

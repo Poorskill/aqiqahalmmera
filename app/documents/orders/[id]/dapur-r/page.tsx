@@ -7,7 +7,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 export default async function PoDapurRPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAuth(['admin', 'dapur']);
+  await requireAuth(['admin', 'master_admin', 'dapur']);
   const { id } = await params;
   const order = getOrderById(id);
 

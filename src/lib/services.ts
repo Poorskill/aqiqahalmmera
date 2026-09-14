@@ -37,6 +37,7 @@ export interface OrderWithRelations {
   updatedAt: string;
   customer?: { name: string; email: string; phone: string };
   orderDetails?: any;
+  items?: any[];
   quotation?: any;
   kandangOrder?: any;
   dapurOrder?: any;
@@ -79,11 +80,153 @@ export function generateVendorInvoiceNo(): string {
   return `INV-${dateStr}-${seq}`;
 }
 
+export function getSlotOccupancy(deliveryDate: string, deliveryTime: string): number {
+  try {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as count FROM orders o
+      JOIN order_details od ON o.id = od.orderId
+      WHERE od.deliveryDate = ? AND od.deliveryTime = ? AND o.status != 'cancelled'
+    `);
+    const res = stmt.get(deliveryDate, deliveryTime) as { count: number };
+    return res?.count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getSlotCapacitiesForDate(deliveryDate: string): Record<string, number> {
+  const slots = [
+    '07.00 WIB', '08.00 WIB', '09.00 WIB', '10.00 WIB', '11.00 WIB',
+    '12.00 WIB', '13.00 WIB', '14.00 WIB', '15.00 WIB', '16.00 WIB', '17.00 WIB'
+  ];
+  const result: Record<string, number> = {};
+  slots.forEach(slot => {
+    result[slot] = getSlotOccupancy(deliveryDate, slot);
+  });
+  return result;
+}
+
+export function getSlotOccupancyExcludingOrder(deliveryDate: string, deliveryTime: string, excludeOrderId: string): number {
+  try {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as count FROM orders o
+      JOIN order_details od ON o.id = od.orderId
+      WHERE od.deliveryDate = ? AND od.deliveryTime = ? AND o.status != 'cancelled' AND o.id != ?
+    `);
+    const res = stmt.get(deliveryDate, deliveryTime, excludeOrderId) as { count: number };
+    return res?.count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function updateOrderService(
+  orderId: string,
+  adminId: string,
+  data: {
+    jenisOrder: string;
+    atasNama: string;
+    fatherName: string;
+    motherName: string;
+    childName: string;
+    recipientName: string;
+    address: string;
+    deliveryDate: string;
+    deliveryTime: string;
+    phone: string;
+    animalOrder: string;
+    dapurAMasakan?: string;
+    dapurANasiBox?: string;
+    pesananLainnya?: string;
+    quotationPrice?: number;
+  }
+) {
+  const existingOrder = getOrderById(orderId);
+  if (!existingOrder) throw new Error('Pesanan tidak ditemukan');
+
+  db.exec('BEGIN EXCLUSIVE TRANSACTION;');
+  try {
+    const otherCount = getSlotOccupancyExcludingOrder(data.deliveryDate, data.deliveryTime, orderId);
+    if (otherCount >= 2) {
+      throw new Error(`Slot ${data.deliveryTime} untuk tanggal ${data.deliveryDate} sudah penuh (2/2). Silakan pilih waktu lainnya.`);
+    }
+
+    const now = new Date().toISOString();
+    const pName = `${data.fatherName} & ${data.motherName}`;
+    const oldTotal = existingOrder.quotationPrice || existingOrder.orderDetails?.totalPelunasan || 0;
+    const newTotal = data.quotationPrice !== undefined ? data.quotationPrice : oldTotal;
+    const diff = newTotal - oldTotal;
+
+    db.prepare('UPDATE orders SET jenisOrder = ?, atasNama = ?, quotationPrice = ?, updatedAt = ? WHERE id = ?')
+      .run(data.jenisOrder, data.atasNama, newTotal, now, orderId);
+
+    const quo = db.prepare('SELECT id FROM quotations WHERE orderId = ?').get(orderId);
+    if (quo) {
+      db.prepare('UPDATE quotations SET price = ?, updatedAt = ? WHERE orderId = ?').run(newTotal, now, orderId);
+    } else if (newTotal > 0) {
+      const quoId = `quo-${Date.now()}`;
+      db.prepare('INSERT INTO quotations (id, orderId, adminId, price, note, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(quoId, orderId, adminId, newTotal, 'Auto-created on order update', 'pending', now, now);
+    }
+
+    db.prepare(`
+      UPDATE order_details
+      SET parentName = ?, fatherName = ?, motherName = ?, childName = ?, recipientName = ?, address = ?, deliveryDate = ?, deliveryTime = ?, phone = ?, animalOrder = ?, dapurAMasakan = ?, dapurANasiBox = ?, pesananLainnya = ?, totalPelunasan = ?
+      WHERE orderId = ?
+    `).run(
+      pName,
+      data.fatherName,
+      data.motherName,
+      data.childName,
+      data.recipientName,
+      data.address,
+      data.deliveryDate,
+      data.deliveryTime,
+      data.phone,
+      data.animalOrder,
+      data.dapurAMasakan || '',
+      data.dapurANasiBox || '',
+      data.pesananLainnya || '',
+      newTotal,
+      orderId
+    );
+
+    db.prepare('DELETE FROM order_items WHERE orderId = ?').run(orderId);
+    db.prepare(`
+      INSERT INTO order_items (id, orderId, animalOrder, dapurAMasakan, dapurANasiBox, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(`item-${Date.now()}-0`, orderId, data.animalOrder, data.dapurAMasakan || '', data.dapurANasiBox || '', now);
+
+    const auditId = `aud-${Date.now()}`;
+    db.prepare(`
+      INSERT INTO access_audit_logs (id, actorId, targetUserId, action, permissionKey, oldValue, newValue, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      auditId,
+      adminId,
+      existingOrder.customerId,
+      'UPDATE_ORDER_WITH_PRICE',
+      'orders.edit',
+      JSON.stringify({ atasNama: existingOrder.atasNama, total: oldTotal, deliveryDate: existingOrder.orderDetails?.deliveryDate }),
+      JSON.stringify({ atasNama: data.atasNama, total: newTotal, deliveryDate: data.deliveryDate, diff }),
+      now
+    );
+
+    db.exec('COMMIT;');
+    return { order: getOrderById(orderId), oldTotal, newTotal, diff };
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
+  }
+}
+
 export function createOrderService(customerId: string, data: {
   invoiceNo: string;
   jenisOrder: string;
   atasNama: string;
-  parentName: string;
+  fatherName: string;
+  motherName: string;
+  parentName?: string;
   childName: string;
   recipientName: string;
   address: string;
@@ -92,7 +235,7 @@ export function createOrderService(customerId: string, data: {
   phone: string;
   driverInfo?: string;
   driverFee?: number;
-  animalOrder: string;
+  animalOrder?: string;
   kandangNote?: string;
   dapurAMasakan?: string;
   dapurANasiBox?: string;
@@ -100,64 +243,125 @@ export function createOrderService(customerId: string, data: {
   dapurRMasakan?: string;
   dapurRNasiBox?: string;
   dapurRNote?: string;
+  items?: Array<{
+    animalOrder: string;
+    kandangNote?: string;
+    dapurAMasakan?: string;
+    dapurANasiBox?: string;
+    dapurANote?: string;
+    dapurRMasakan?: string;
+    dapurRNasiBox?: string;
+    dapurRNote?: string;
+  }>;
   paymentStatus: string;
+  pesananLainnya?: string;
   totalPelunasan: number;
   totalBayar: number;
 }) {
-  const orderId = `ord-${Date.now()}`;
-  const vendorInvoiceNo = generateVendorInvoiceNo();
-  const now = new Date().toISOString();
+  db.exec('BEGIN EXCLUSIVE TRANSACTION;');
+  try {
+    const currentCount = getSlotOccupancy(data.deliveryDate, data.deliveryTime);
+    if (currentCount >= 2) {
+      throw new Error(`Slot ${data.deliveryTime} untuk tanggal ${data.deliveryDate} sudah penuh (2/2). Silakan pilih waktu lainnya.`);
+    }
 
-  const insertOrder = db.prepare(`
-    INSERT INTO orders (id, invoiceNo, vendorInvoiceNo, customerId, orderDate, jenisOrder, atasNama, status, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting_review', ?, ?)
-  `);
-  insertOrder.run(orderId, data.invoiceNo || vendorInvoiceNo, vendorInvoiceNo, customerId, now, data.jenisOrder, data.atasNama, now, now);
+    const orderId = `ord-${Date.now()}`;
+    const vendorInvoiceNo = generateVendorInvoiceNo();
+    const now = new Date().toISOString();
+    const pName = data.parentName || `${data.fatherName} & ${data.motherName}`;
 
-  const insertDetail = db.prepare(`
-    INSERT INTO order_details (
-      id, orderId, parentName, childName, recipientName, address, deliveryDate, deliveryTime, phone, driverInfo, driverFee,
-      animalOrder, kandangNote, dapurAMasakan, dapurANasiBox, dapurANote, dapurRMasakan, dapurRNasiBox, dapurRNote,
-      paymentStatus, totalPelunasan, totalBayar, createdAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertDetail.run(
-    `det-${Date.now()}`,
-    orderId,
-    data.parentName,
-    data.childName,
-    data.recipientName,
-    data.address,
-    data.deliveryDate,
-    data.deliveryTime,
-    data.phone,
-    data.driverInfo || '',
-    data.driverFee || 0,
-    data.animalOrder,
-    data.kandangNote || '',
-    data.dapurAMasakan || '',
-    data.dapurANasiBox || '',
-    data.dapurANote || '',
-    data.dapurRMasakan || '',
-    data.dapurRNasiBox || '',
-    data.dapurRNote || '',
-    data.paymentStatus,
-    data.totalPelunasan,
-    data.totalBayar,
-    now
-  );
+    const insertOrder = db.prepare(`
+      INSERT INTO orders (id, invoiceNo, vendorInvoiceNo, customerId, orderDate, jenisOrder, atasNama, status, quotationPrice, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting_review', ?, ?, ?)
+    `);
+    insertOrder.run(orderId, data.invoiceNo || vendorInvoiceNo, vendorInvoiceNo, customerId, now, data.jenisOrder, data.atasNama, data.totalPelunasan || 0, now, now);
 
-  createNotification({
-    userId: customerId,
-    category: 'pesanan',
-    title: 'Pesanan Berhasil Diajukan',
-    message: `Pesanan baru #${vendorInvoiceNo} untuk ${data.atasNama} telah diajukan dan menunggu peninjauan admin.`,
-    priority: 'medium',
-    actionUrl: `/customer/orders/${orderId}`,
-    relatedEntityId: orderId,
-  });
+    const orderItems = data.items && data.items.length > 0 ? data.items : [{
+      animalOrder: data.animalOrder || 'Kambing Standar',
+      kandangNote: data.kandangNote,
+      dapurAMasakan: data.dapurAMasakan,
+      dapurANasiBox: data.dapurANasiBox,
+      dapurANote: data.dapurANote,
+      dapurRMasakan: data.dapurRMasakan,
+      dapurRNasiBox: data.dapurRNasiBox,
+      dapurRNote: data.dapurRNote,
+    }];
 
-  return getOrderById(orderId);
+    const firstItem = orderItems[0];
+
+    const insertDetail = db.prepare(`
+      INSERT INTO order_details (
+        id, orderId, parentName, fatherName, motherName, childName, recipientName, address, deliveryDate, deliveryTime, phone, driverInfo, driverFee,
+        animalOrder, kandangNote, dapurAMasakan, dapurANasiBox, dapurANote, dapurRMasakan, dapurRNasiBox, dapurRNote, pesananLainnya,
+        paymentStatus, totalPelunasan, totalBayar, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertDetail.run(
+      `det-${Date.now()}`,
+      orderId,
+      pName,
+      data.fatherName,
+      data.motherName,
+      data.childName,
+      data.recipientName,
+      data.address,
+      data.deliveryDate,
+      data.deliveryTime,
+      data.phone,
+      data.driverInfo || '',
+      data.driverFee || 0,
+      firstItem.animalOrder,
+      firstItem.kandangNote || '',
+      firstItem.dapurAMasakan || '',
+      firstItem.dapurANasiBox || '',
+      firstItem.dapurANote || '',
+      firstItem.dapurRMasakan || '',
+      firstItem.dapurRNasiBox || '',
+      firstItem.dapurRNote || '',
+      data.pesananLainnya || '',
+      data.paymentStatus,
+      data.totalPelunasan,
+      data.totalBayar,
+      now
+    );
+
+    const insertItemStmt = db.prepare(`
+      INSERT INTO order_items (id, orderId, animalOrder, kandangNote, dapurAMasakan, dapurANasiBox, dapurANote, dapurRMasakan, dapurRNasiBox, dapurRNote, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    orderItems.forEach((it, idx) => {
+      insertItemStmt.run(
+        `item-${Date.now()}-${idx}`,
+        orderId,
+        it.animalOrder,
+        it.kandangNote || '',
+        it.dapurAMasakan || '',
+        it.dapurANasiBox || '',
+        it.dapurANote || '',
+        it.dapurRMasakan || '',
+        it.dapurRNasiBox || '',
+        it.dapurRNote || '',
+        now
+      );
+    });
+
+    createNotification({
+      userId: customerId,
+      category: 'pesanan',
+      title: 'Pesanan Berhasil Diajukan',
+      message: `Pesanan baru #${vendorInvoiceNo} untuk ${data.atasNama} telah diajukan dan menunggu peninjauan admin.`,
+      priority: 'medium',
+      actionUrl: `/customer/orders/${orderId}`,
+      relatedEntityId: orderId,
+    });
+
+    db.exec('COMMIT;');
+    return getOrderById(orderId);
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
+  }
 }
 
 export function getAllOrders(filters?: { customerId?: string; role?: string; status?: string; search?: string }) {
@@ -199,6 +403,28 @@ function enrichOrder(order: any): OrderWithRelations {
   const detailStmt = db.prepare('SELECT * FROM order_details WHERE orderId = ?');
   const orderDetails = detailStmt.get(order.id);
 
+  const itemsStmt = db.prepare('SELECT * FROM order_items WHERE orderId = ?');
+  let items = itemsStmt.all(order.id) as any[];
+  if (!items || items.length === 0) {
+    if (orderDetails) {
+      items = [{
+        id: orderDetails.id || `item-${order.id}-1`,
+        orderId: order.id,
+        animalOrder: orderDetails.animalOrder || '',
+        kandangNote: orderDetails.kandangNote || '',
+        dapurAMasakan: orderDetails.dapurAMasakan || '',
+        dapurANasiBox: orderDetails.dapurANasiBox || '',
+        dapurANote: orderDetails.dapurANote || '',
+        dapurRMasakan: orderDetails.dapurRMasakan || '',
+        dapurRNasiBox: orderDetails.dapurRNasiBox || '',
+        dapurRNote: orderDetails.dapurRNote || '',
+        createdAt: orderDetails.createdAt || order.createdAt
+      }];
+    } else {
+      items = [];
+    }
+  }
+
   const quoStmt = db.prepare('SELECT * FROM quotations WHERE orderId = ?');
   const quotation = quoStmt.get(order.id);
 
@@ -221,6 +447,7 @@ function enrichOrder(order: any): OrderWithRelations {
     ...order,
     customer,
     orderDetails,
+    items,
     quotation,
     kandangOrder,
     dapurOrder,
@@ -231,18 +458,55 @@ function enrichOrder(order: any): OrderWithRelations {
 }
 
 // Quotation & Operational Distribution
-export function createQuotationService(orderId: string, adminId: string, price: number, note: string) {
+export function createQuotationService(
+  orderId: string,
+  adminId: string,
+  price: number,
+  note: string,
+  operational?: {
+    pesanKandang?: string;
+    pesanDapurA?: string;
+    pesanDapurR?: string;
+    pesanDriver?: string;
+    uangSakuDriver?: number;
+  }
+) {
   const now = new Date().toISOString();
   const existing = db.prepare('SELECT id FROM quotations WHERE orderId = ?').get(orderId);
 
-  if (existing) {
-    db.prepare('UPDATE quotations SET price = ?, note = ?, status = \'pending\', updatedAt = ? WHERE orderId = ?').run(price, note, now, orderId);
-  } else {
-    const id = `quo-${Date.now()}`;
-    db.prepare('INSERT INTO quotations (id, orderId, adminId, price, note, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, \'pending\', ?, ?)').run(id, orderId, adminId, price, note, now, now);
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    if (existing) {
+      db.prepare('UPDATE quotations SET price = ?, note = ?, status = \'pending\', updatedAt = ? WHERE orderId = ?').run(price, note, now, orderId);
+    } else {
+      const id = `quo-${Date.now()}`;
+      db.prepare('INSERT INTO quotations (id, orderId, adminId, price, note, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, \'pending\', ?, ?)').run(id, orderId, adminId, price, note, now, now);
+    }
+
+    db.prepare('UPDATE orders SET status = \'quotation_sent\', quotationPrice = ?, updatedAt = ? WHERE id = ?').run(price, now, orderId);
+    db.prepare('UPDATE order_details SET totalPelunasan = ? WHERE orderId = ?').run(price, orderId);
+
+    if (operational) {
+      db.prepare(`
+        UPDATE order_details 
+        SET pesanKandang = ?, pesanDapurA = ?, pesanDapurR = ?, pesanDriver = ?, uangSakuDriver = ?
+        WHERE orderId = ?
+      `).run(
+        operational.pesanKandang || '',
+        operational.pesanDapurA || '',
+        operational.pesanDapurR || '',
+        operational.pesanDriver || '',
+        operational.uangSakuDriver || 0,
+        orderId
+      );
+    }
+
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    throw err;
   }
 
-  db.prepare('UPDATE orders SET status = \'quotation_sent\', quotationPrice = ?, updatedAt = ? WHERE id = ?').run(price, now, orderId);
   const updatedOrder = getOrderById(orderId);
   if (updatedOrder) {
     createNotification({
@@ -374,6 +638,65 @@ export function updateDapurStatusService(orderId: string, kitchenStatus: string,
   } else if (kitchenStatus === 'packed') {
     updateOrderStatusService(orderId, 'packaging');
   }
+  return getOrderById(orderId);
+}
+
+export function markDriverArrived(orderId: string, driverId: string) {
+  const driverOrder = db.prepare('SELECT * FROM driver_orders WHERE orderId = ?').get(orderId) as any;
+  if (!driverOrder) throw new Error('Data pengiriman tidak ditemukan.');
+  if (driverOrder.status !== 'on_delivery') throw new Error('Pengiriman harus berstatus "on_delivery" untuk menandai tiba.');
+  if (driverOrder.arrivedAt) throw new Error('Driver sudah menandai tiba di lokasi.');
+  const now = new Date().toISOString();
+  db.prepare('UPDATE driver_orders SET arrivedAt = ? WHERE orderId = ?').run(now, orderId);
+  logAudit(driverId, 'driver_arrived', 'driver_orders', orderId, driverOrder.status, 'arrived');
+  return getOrderById(orderId);
+}
+
+export function completeDeliveryService(orderId: string, driverId: string, data: {
+  deliveryProof?: string;
+  deliveryNote?: string;
+}) {
+  const driverOrder = db.prepare('SELECT * FROM driver_orders WHERE orderId = ?').get(orderId) as any;
+  if (!driverOrder) throw new Error('Data pengiriman tidak ditemukan.');
+  if (driverOrder.status === 'delivered') throw new Error('Pengiriman sudah diselesaikan sebelumnya.');
+  if (driverOrder.status !== 'on_delivery') throw new Error('Pengiriman harus berstatus "on_delivery" untuk diselesaikan.');
+  if (!driverOrder.arrivedAt) throw new Error('Driver harus menandai "Tiba di Lokasi" terlebih dahulu.');
+  if (!data.deliveryProof) throw new Error('Bukti pengiriman (foto) wajib diunggah.');
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE driver_orders SET status = 'delivered', deliveredAt = ?, deliveryProof = ?, deliveryNote = ? WHERE orderId = ?
+  `).run(now, data.deliveryProof, data.deliveryNote || null, orderId);
+
+  updateOrderStatusService(orderId, 'completed');
+  logAudit(driverId, 'delivery_completed', 'driver_orders', orderId, 'on_delivery', 'delivered');
+
+  const order = getOrderById(orderId);
+  if (order) {
+    createNotification({
+      userId: order.customerId,
+      category: 'pesanan',
+      title: 'Pesanan Selesai Dikirim',
+      message: `Pesanan #${order.vendorInvoiceNo} telah selesai dikirim dan diterima. Terima kasih telah menggunakan Aqiqah Almeera!`,
+      priority: 'medium',
+      actionUrl: `/customer/orders/${orderId}`,
+      relatedEntityId: orderId,
+    });
+
+    const admins = db.prepare("SELECT id FROM users WHERE role IN ('admin', 'master_admin') AND status = 'active'").all() as any[];
+    admins.forEach(admin => {
+      createNotification({
+        userId: admin.id,
+        category: 'pengiriman',
+        title: 'Pengiriman Selesai',
+        message: `Pesanan #${order.vendorInvoiceNo} telah selesai dikirim oleh driver.`,
+        priority: 'medium',
+        actionUrl: `/customer/orders/${orderId}`,
+        relatedEntityId: orderId,
+      });
+    });
+  }
+
   return getOrderById(orderId);
 }
 

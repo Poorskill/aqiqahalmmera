@@ -14,7 +14,7 @@ export default async function KandangOrderDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; success?: string }>;
 }) {
-  const user = await requireAuth(['kandang', 'admin']);
+  const user = await requireAuth(['kandang', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
   const order = getOrderById(id);
@@ -168,9 +168,18 @@ export default async function KandangOrderDetailPage({
                 <div className="space-y-1">
                   <p><strong className="text-[#775847]">Catatan / Permintaan Khusus:</strong></p>
                   <p className="p-3 bg-amber-50 border border-amber-500 text-xs font-medium text-amber-950">
-                    {kandang.notes || order.orderDetails?.kandangNote || 'Tidak ada catatan khusus dari shohibul.'}
+                    {kandang.notes || order.orderDetails?.kandangNote || 'Tidak ada catatan khusus.'}
                   </p>
                 </div>
+
+                {order.orderDetails?.pesanKandang && (
+                  <div className="space-y-1">
+                    <p><strong className="text-[#775847]">Pesan Khusus dari Admin (Kandang):</strong></p>
+                    <p className="p-3 bg-amber-100/70 border border-amber-600/40 text-xs font-bold text-amber-950 rounded-xl">
+                      {order.orderDetails.pesanKandang}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

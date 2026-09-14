@@ -6,7 +6,7 @@ import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage() {
-  const user = await requireAuth(['admin']);
+  const user = await requireAuth(['admin', 'master_admin']);
   const stmt = db.prepare('SELECT id, name, email, role, phone, createdAt FROM users ORDER BY createdAt DESC');
   const users = stmt.all() as any[];
 

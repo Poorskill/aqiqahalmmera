@@ -6,16 +6,33 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DriverDashboardPage() {
+export default async function DriverDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
   const user = await requireAuth(['driver', 'admin', 'master_admin']);
+  const qParams = await searchParams;
+
   const stmt = db.prepare(`
     SELECT dr.*, o.vendorInvoiceNo, o.atasNama, o.status as orderStatus
     FROM driver_orders dr
     JOIN orders o ON dr.orderId = o.id
     ORDER BY dr.receivedAt DESC
   `);
-  const driverOrders = stmt.all() as any[];
+  const allDriverOrders = stmt.all() as any[];
+
+  const driverOrders = user.role === 'driver'
+    ? allDriverOrders.filter(d => !d.driverId || d.driverId === user.id)
+    : allDriverOrders;
+
   const pendingDelivery = driverOrders.filter(d => d.status === 'assigned' || d.status === 'on_delivery');
+
+  const statusLabel: Record<string, string> = {
+    assigned: 'Ditugaskan',
+    on_delivery: 'Dalam Perjalanan',
+    delivered: 'Terkirim',
+  };
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">
@@ -24,7 +41,20 @@ export default async function DriverDashboardPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <AlmeeraTopbar title="Operasional Driver" subtitle="Pengiriman Pesanan Door-to-Door Cilacap" role={user.role} />
 
-        <main className="p-8 space-y-6 max-w-7xl mx-auto w-full">
+        <main className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto w-full">
+          {qParams.error && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">error</span>
+              <span>{qParams.error}</span>
+            </div>
+          )}
+          {qParams.success && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span>{qParams.success}</span>
+            </div>
+          )}
+
           {/* Driver Action Center */}
           <div className="bg-white border border-stone-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
@@ -40,7 +70,7 @@ export default async function DriverDashboardPage() {
             {pendingDelivery.length === 0 ? (
               <div className="p-6 bg-stone-50/60 border border-stone-200/80 rounded-xl text-center space-y-1">
                 <span className="material-symbols-outlined text-3xl text-emerald-600 mb-1">check_circle</span>
-                <p className="text-xs font-bold text-stone-900">Tidak ada pengiriman untuk hari ini</p>
+                <p className="text-xs font-bold text-stone-900">Tidak ada pengiriman aktif</p>
                 <p className="text-xs text-stone-500">Semua tugas pengantaran telah selesai dikirim.</p>
               </div>
             ) : (
@@ -50,30 +80,37 @@ export default async function DriverDashboardPage() {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-mono font-bold text-amber-900 bg-white px-2 py-0.5 rounded border border-stone-200">{item.vendorInvoiceNo}</span>
-                        <span className="px-2 py-0.5 bg-blue-200 text-blue-900 text-[10px] font-bold uppercase rounded">{item.status}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
+                          item.status === 'on_delivery' ? 'bg-blue-200 text-blue-900' : 'bg-amber-100 text-amber-900'
+                        }`}>{statusLabel[item.status] || item.status}</span>
                       </div>
                       <h5 className="text-xs font-bold text-stone-900">Penerima: {item.contactPerson}</h5>
                       <p className="text-xs text-stone-600 mt-1 truncate">Alamat: {item.deliveryAddress}</p>
                       <p className="text-[11px] text-stone-500 mt-0.5">Jadwal: {item.deliverySchedule}</p>
+                      {item.arrivedAt && (
+                        <p className="text-[11px] text-sky-700 font-semibold mt-0.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-xs">pin_drop</span>
+                          Tiba di lokasi
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
                       <Link href={`/driver/orders/${item.orderId}`} className="flex-1 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-xs font-semibold text-center transition-all">
                         Detail
                       </Link>
-                      {item.status === 'assigned' ? (
+                      {item.status === 'assigned' && (
                         <form action={`/api/driver/${item.orderId}/update`} method="POST" className="flex-1">
-                          <input type="hidden" name="status" value="on_delivery" />
+                          <input type="hidden" name="action" value="start" />
+                          <input type="hidden" name="redirectTo" value="/driver/dashboard" />
                           <button type="submit" className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
                             Mulai Kirim
                           </button>
                         </form>
-                      ) : (
-                        <form action={`/api/driver/${item.orderId}/update`} method="POST" className="flex-1">
-                          <input type="hidden" name="status" value="delivered" />
-                          <button type="submit" className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
-                            Terkirim
-                          </button>
-                        </form>
+                      )}
+                      {item.status === 'on_delivery' && (
+                        <Link href={`/driver/orders/${item.orderId}`} className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold text-center shadow-xs transition-all">
+                          Selesaikan
+                        </Link>
                       )}
                     </div>
                   </div>
@@ -86,7 +123,7 @@ export default async function DriverDashboardPage() {
             <div className="flex items-center justify-between border-b border-stone-100 pb-4">
               <div>
                 <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Tugas Pengantaran</span>
-                <h3 className="text-lg font-bold text-stone-900 mt-0.5">Daftar Pengiriman Driver ({driverOrders.length})</h3>
+                <h3 className="text-lg font-bold text-stone-900 mt-0.5">Daftar Pengiriman ({driverOrders.length})</h3>
               </div>
             </div>
 
@@ -99,7 +136,7 @@ export default async function DriverDashboardPage() {
                     <th className="py-3 px-4">Alamat Tujuan</th>
                     <th className="py-3 px-4">Jadwal Kirim</th>
                     <th className="py-3 px-4">Status Kirim</th>
-                    <th className="py-3 px-4 text-right">Aksi Update</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-sm">
@@ -122,28 +159,16 @@ export default async function DriverDashboardPage() {
                             item.status === 'on_delivery' ? 'bg-blue-100 text-blue-900' :
                             'bg-amber-100 text-amber-900'
                           }`}>
-                            {item.status}
+                            {statusLabel[item.status] || item.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-right space-x-2">
+                        <td className="py-4 px-4 text-right">
                           <Link
                             href={`/driver/orders/${item.orderId}`}
                             className="inline-flex items-center gap-1 px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold transition-all"
                           >
                             Detail
                           </Link>
-                          <form action={`/api/driver/${item.orderId}/update`} method="POST" className="inline-flex">
-                            <input type="hidden" name="status" value="on_delivery" />
-                            <button type="submit" className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
-                              Mulai Kirim
-                            </button>
-                          </form>
-                          <form action={`/api/driver/${item.orderId}/update`} method="POST" className="inline-flex">
-                            <input type="hidden" name="status" value="delivered" />
-                            <button type="submit" className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
-                              Terkirim
-                            </button>
-                          </form>
                         </td>
                       </tr>
                     ))

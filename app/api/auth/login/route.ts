@@ -18,6 +18,10 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL('/login?error=Email atau password salah', request.url));
     }
 
+    if (user.status && user.status !== 'active') {
+      return NextResponse.redirect(new URL('/login?error=Akun Anda dinonaktifkan. Hubungi Master Admin.', request.url));
+    }
+
     await createSession(user.id);
 
     // Redirect based on role

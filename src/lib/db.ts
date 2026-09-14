@@ -70,6 +70,21 @@ export function initDb() {
       try { db.exec(`ALTER TABLE admin_orders ADD COLUMN ${col} TEXT;`); } catch {}
     });
 
+    const orderCols = ['quotationPrice', 'approvedAt'];
+    orderCols.forEach(col => {
+      try { db.exec(`ALTER TABLE orders ADD COLUMN ${col} REAL;`); } catch {}
+    });
+
+    const orderDetailCols = ['fatherName', 'motherName', 'pesananLainnya', 'pesanKandang', 'pesanDapurA', 'pesanDapurR', 'pesanDriver', 'uangSakuDriver', 'totalPelunasan', 'totalBayar'];
+    orderDetailCols.forEach(col => {
+      try { db.exec(`ALTER TABLE order_details ADD COLUMN ${col} REAL;`); } catch {}
+    });
+
+    const driverOrderCols = ['driverId', 'arrivedAt', 'deliveredAt', 'deliveryProof', 'deliveryNote'];
+    driverOrderCols.forEach(col => {
+      try { db.exec(`ALTER TABLE driver_orders ADD COLUMN ${col} TEXT;`); } catch {}
+    });
+
     db.exec(`
 
     CREATE TABLE IF NOT EXISTS roles (
@@ -154,9 +169,30 @@ export function initDb() {
       dapurRMasakan TEXT,
       dapurRNasiBox TEXT,
       dapurRNote TEXT,
+      pesananLainnya TEXT,
+      pesanKandang TEXT,
+      pesanDapurA TEXT,
+      pesanDapurR TEXT,
+      pesanDriver TEXT,
+      uangSakuDriver REAL DEFAULT 0,
       paymentStatus TEXT NOT NULL DEFAULT 'dp',
       totalPelunasan REAL NOT NULL DEFAULT 0,
       totalBayar REAL NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS order_items (
+      id TEXT PRIMARY KEY,
+      orderId TEXT NOT NULL,
+      animalOrder TEXT NOT NULL,
+      kandangNote TEXT,
+      dapurAMasakan TEXT,
+      dapurANasiBox TEXT,
+      dapurANote TEXT,
+      dapurRMasakan TEXT,
+      dapurRNasiBox TEXT,
+      dapurRNote TEXT,
       createdAt TEXT NOT NULL,
       FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
     );

@@ -4,48 +4,61 @@ import { createOrderService } from '@/lib/services';
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAuth(['customer', 'admin']);
+    const user = await requireAuth(['customer', 'admin', 'master_admin']);
     const formData = await request.formData();
 
     const invoiceNo = formData.get('invoiceNo') as string;
     const jenisOrder = formData.get('jenisOrder') as string;
     const atasNama = formData.get('atasNama') as string;
-    const parentName = formData.get('parentName') as string;
+    const fatherName = formData.get('fatherName') as string || formData.get('parentName') as string || '';
+    const motherName = formData.get('motherName') as string || '';
     const childName = formData.get('childName') as string;
     const recipientName = formData.get('recipientName') as string;
     const address = formData.get('address') as string;
     const deliveryDate = formData.get('deliveryDate') as string;
     const deliveryTime = formData.get('deliveryTime') as string;
     const phone = formData.get('phone') as string;
-    const animalOrder = formData.get('animalOrder') as string;
-    const kandangNote = formData.get('kandangNote') as string;
-    const dapurAMasakan = formData.get('dapurAMasakan') as string;
-    const dapurANasiBox = formData.get('dapurANasiBox') as string;
-    const dapurANote = formData.get('dapurANote') as string;
+    const pesananLainnya = formData.get('pesananLainnya') as string;
 
-    if (!atasNama || !recipientName || !address || !deliveryDate || !animalOrder) {
-      return NextResponse.redirect(new URL('/customer/orders/new?error=Kolom wajib bertanda * harus diisi', request.url));
+    const itemsJson = formData.get('itemsJson') as string;
+    let items: any[] = [];
+    try {
+      if (itemsJson) items = JSON.parse(itemsJson);
+    } catch {}
+
+    if (!items || items.length === 0) {
+      items = [{
+        animalOrder: formData.get('animalOrder') as string || 'Kambing Standar',
+        kandangNote: formData.get('kandangNote') as string || '',
+        dapurAMasakan: formData.get('dapurAMasakan') as string || '',
+        dapurANasiBox: formData.get('dapurANasiBox') as string || '',
+        dapurANote: formData.get('dapurANote') as string || '',
+      }];
+    }
+
+    if (!atasNama || !fatherName || !motherName || !childName || !recipientName || !address || !deliveryDate || items.some((it: any) => !it.animalOrder)) {
+      const errUrl = user.role === 'admin' ? '/admin/orders/new?error=Kolom wajib bertanda * harus diisi' : '/customer/orders/new?error=Kolom wajib bertanda * harus diisi';
+      return NextResponse.redirect(new URL(errUrl, request.url));
     }
 
     const order = createOrderService(user.role === 'admin' ? (formData.get('customerId') as string || user.id) : user.id, {
       invoiceNo: invoiceNo || `INV-MGR-${Date.now().toString().slice(-6)}`,
       jenisOrder,
       atasNama,
-      parentName,
+      fatherName,
+      motherName,
+      parentName: `${fatherName} & ${motherName}`,
       childName,
       recipientName,
       address,
       deliveryDate,
       deliveryTime,
       phone,
-      animalOrder,
-      kandangNote,
-      dapurAMasakan,
-      dapurANasiBox,
-      dapurANote,
-      paymentStatus: 'dp',
-      totalPelunasan: 0,
-      totalBayar: 0,
+      pesananLainnya,
+      items,
+      paymentStatus: formData.get('paymentStatus') as string || 'dp',
+      totalPelunasan: parseFloat(formData.get('totalPelunasan') as string) || 0,
+      totalBayar: parseFloat(formData.get('totalBayar') as string) || 0,
     });
 
     if (!order) {
@@ -55,6 +68,8 @@ export async function POST(request: Request) {
     const redirectPath = user.role === 'admin' ? `/admin/orders/${order.id}` : `/customer/orders/${order.id}`;
     return NextResponse.redirect(new URL(redirectPath, request.url));
   } catch (err: any) {
-    return NextResponse.redirect(new URL(`/customer/orders/new?error=${encodeURIComponent(err.message || 'Gagal membuat pesanan')}`, request.url));
+    const userRole = 'customer'; // default fallback for error redirect
+    const errUrl = '/customer/orders/new';
+    return NextResponse.redirect(new URL(`${errUrl}?error=${encodeURIComponent(err.message || 'Gagal membuat pesanan')}`, request.url));
   }
 }

@@ -5,7 +5,6 @@ export function OrderStatusTimeline({ currentStatus }: { currentStatus: string }
   const totalSteps = orderSteps.length;
   const progressPercent = currentStatus === 'completed' ? 100 : Math.min(100, Math.round((currentStepNum / totalSteps) * 100));
 
-  const currentStepObj = orderSteps.find((_, idx) => idx + 1 === currentStepNum);
   const nextStepObj = orderSteps.find((_, idx) => idx + 1 === currentStepNum + 1);
 
   return (

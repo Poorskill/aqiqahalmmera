@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createReviewService } from '@/lib/services';
+import { createReviewService, getOrderById } from '@/lib/services';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth(['customer']);
     const { id } = await params;
+    const order = getOrderById(id);
+    if (!order) {
+      throw new Error('Pesanan tidak ditemukan');
+    }
+    if (order.customerId !== user.id) {
+      throw new Error('Akses ditolak: Pesanan ini bukan milik Anda');
+    }
     const formData = await request.formData();
     const rating = parseInt(formData.get('rating') as string || '5');
     const comment = formData.get('comment') as string;
