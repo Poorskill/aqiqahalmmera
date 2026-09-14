@@ -1,5 +1,4 @@
-// @ts-ignore
-import { DatabaseSync } from 'node:sqlite';
+import alasql from 'alasql';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -11,30 +10,112 @@ try {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
-} catch {
-  // Ignore read-only dir errors in serverless
+} catch {}
+
+const dbPath = path.join(dataDir, 'aqiqah_store.json');
+
+function persistDb() {
+  try {
+    const dbObj = (alasql as any).databases?.alasql;
+    if (!dbObj || !dbObj.tables) return;
+    const dump: Record<string, any[]> = {};
+    for (const tableName of Object.keys(dbObj.tables)) {
+      dump[tableName] = dbObj.tables[tableName].data || [];
+    }
+    fs.writeFileSync(dbPath, JSON.stringify(dump));
+  } catch {}
 }
 
-const dbPath = path.join(dataDir, 'aqiqah.db');
-
-// If running in serverless and template DB exists in bundle, copy to /tmp if not yet present
-if (isServerless) {
+function restoreDb() {
   try {
-    const bundledDbPath = path.join(process.cwd(), 'data', 'aqiqah.db');
-    if (fs.existsSync(bundledDbPath) && !fs.existsSync(dbPath)) {
-      fs.copyFileSync(bundledDbPath, dbPath);
+    if (fs.existsSync(dbPath)) {
+      const dump = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+      const dbObj = (alasql as any).databases?.alasql;
+      if (dbObj && dbObj.tables) {
+        for (const tableName of Object.keys(dump)) {
+          if (dbObj.tables[tableName]) {
+            dbObj.tables[tableName].data = dump[tableName];
+          }
+        }
+      }
     }
   } catch {}
 }
 
-let db: DatabaseSync;
-try {
-  db = new DatabaseSync(dbPath);
-} catch {
-  // If opening in primary path fails, fallback to /tmp
-  const fallbackPath = path.join('/tmp', 'aqiqah.db');
-  db = new DatabaseSync(fallbackPath);
+function parseInsertOrReplace(sql: string): { table: string; firstCol: string } | null {
+  const m = sql.match(/^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)/i);
+  if (!m) return null;
+  return { table: m[1], firstCol: m[2].split(',')[0].trim() };
 }
+
+function sanitize(sql: string): string {
+  return sql
+    .replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO')
+    .replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO')
+    .replace(/PRAGMA\s+[^;]+;?/gi, '')
+    .replace(/AUTOINCREMENT/gi, '')
+    .replace(/COLLATE\s+\w+/gi, '');
+}
+
+const db = {
+  exec(sql: string) {
+    const statements = sql
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    for (const s of statements) {
+      if (/^\s*(BEGIN|COMMIT|ROLLBACK|PRAGMA)/i.test(s)) continue;
+      try {
+        alasql(sanitize(s));
+      } catch {}
+    }
+    persistDb();
+  },
+  prepare(sql: string) {
+    if (/^\s*(BEGIN|COMMIT|ROLLBACK|PRAGMA)/i.test(sql)) {
+      return {
+        get: () => undefined,
+        all: () => [],
+        run: () => ({ changes: 0, lastInsertRowid: 0 })
+      };
+    }
+    const replaceInfo = parseInsertOrReplace(sql);
+    const cleanSql = sanitize(sql);
+    return {
+      get(...params: any[]) {
+        try {
+          const res = alasql(cleanSql, params);
+          if (Array.isArray(res)) {
+            return res.length > 0 ? res[0] : undefined;
+          }
+          return res || undefined;
+        } catch {
+          return undefined;
+        }
+      },
+      all(...params: any[]) {
+        try {
+          const res = alasql(cleanSql, params);
+          return Array.isArray(res) ? res : (res ? [res] : []);
+        } catch {
+          return [];
+        }
+      },
+      run(...params: any[]) {
+        try {
+          if (replaceInfo) {
+            try { alasql(`DELETE FROM ${replaceInfo.table} WHERE ${replaceInfo.firstCol} = ?`, [params[0]]); } catch {}
+          }
+          const res = alasql(cleanSql, params);
+          persistDb();
+          return { changes: Array.isArray(res) ? res.length : 1, lastInsertRowid: 0 };
+        } catch {
+          return { changes: 0, lastInsertRowid: 0 };
+        }
+      }
+    };
+  }
+};
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -54,332 +135,247 @@ export function verifyPassword(password: string, stored: string): boolean {
   }
 }
 
+let isInitialized = false;
+
 // Initialize tables
 export function initDb() {
   if (process.env.NEXT_PHASE === 'phase-production-build') return;
-  try {
-    db.exec('PRAGMA busy_timeout = 5000;');
-    try {
-      db.exec('PRAGMA journal_mode = WAL;');
-    } catch {
-      try {
-        db.exec('PRAGMA journal_mode = DELETE;');
-      } catch {}
-    }
-  } catch {}
+  if (isInitialized) return;
+  isInitialized = true;
 
   try {
     db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'customer',
-      status TEXT NOT NULL DEFAULT 'active',
-      province TEXT,
-      city TEXT,
-      district TEXT,
-      village TEXT,
-      address TEXT,
-      postalCode TEXT,
-      notes TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
+      id STRING PRIMARY KEY,
+      name STRING NOT NULL,
+      email STRING UNIQUE NOT NULL,
+      password STRING NOT NULL,
+      phone STRING NOT NULL,
+      role STRING NOT NULL DEFAULT 'customer',
+      status STRING NOT NULL DEFAULT 'active',
+      province STRING,
+      city STRING,
+      district STRING,
+      village STRING,
+      address STRING,
+      postalCode STRING,
+      notes STRING,
+      profileImageUrl STRING,
+      createdAt STRING NOT NULL,
+      updatedAt STRING NOT NULL
     );
-    `);
-
-    const cols = ['province', 'city', 'district', 'village', 'address', 'postalCode', 'notes', 'status', 'profileImageUrl'];
-    cols.forEach(col => {
-      try { db.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT;`); } catch {}
-    });
-
-    const adminCols = ['status_terkini', 'monitoring_notes', 'statusTerkini', 'monitoringNotes'];
-    adminCols.forEach(col => {
-      try { db.exec(`ALTER TABLE admin_orders ADD COLUMN ${col} TEXT;`); } catch {}
-    });
-
-    const orderCols = ['quotationPrice', 'approvedAt'];
-    orderCols.forEach(col => {
-      try { db.exec(`ALTER TABLE orders ADD COLUMN ${col} REAL;`); } catch {}
-    });
-
-    const orderDetailCols = ['fatherName', 'motherName', 'pesananLainnya', 'pesanKandang', 'pesanDapurA', 'pesanDapurR', 'pesanDriver', 'uangSakuDriver', 'totalPelunasan', 'totalBayar'];
-    orderDetailCols.forEach(col => {
-      try { db.exec(`ALTER TABLE order_details ADD COLUMN ${col} REAL;`); } catch {}
-    });
-
-    const driverOrderCols = ['driverId', 'arrivedAt', 'deliveredAt', 'deliveryProof', 'deliveryNote'];
-    driverOrderCols.forEach(col => {
-      try { db.exec(`ALTER TABLE driver_orders ADD COLUMN ${col} TEXT;`); } catch {}
-    });
-
-    db.exec(`
 
     CREATE TABLE IF NOT EXISTS roles (
-      id TEXT PRIMARY KEY,
-      name TEXT UNIQUE NOT NULL,
-      description TEXT,
-      isSystemRole INTEGER DEFAULT 1,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
+      id STRING PRIMARY KEY,
+      name STRING UNIQUE NOT NULL,
+      description STRING,
+      isSystemRole INT DEFAULT 1,
+      createdAt STRING NOT NULL,
+      updatedAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS permissions (
-      id TEXT PRIMARY KEY,
-      key TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      module TEXT NOT NULL,
-      description TEXT,
-      createdAt TEXT NOT NULL
+      id STRING PRIMARY KEY,
+      key STRING UNIQUE NOT NULL,
+      name STRING NOT NULL,
+      module STRING NOT NULL,
+      description STRING,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS role_permissions (
-      roleId TEXT NOT NULL,
-      permissionId TEXT NOT NULL,
-      PRIMARY KEY (roleId, permissionId),
-      FOREIGN KEY (roleId) REFERENCES roles(id) ON DELETE CASCADE,
-      FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE
+      roleId STRING NOT NULL,
+      permissionId STRING NOT NULL,
+      PRIMARY KEY (roleId, permissionId)
     );
 
     CREATE TABLE IF NOT EXISTS user_permissions (
-      userId TEXT NOT NULL,
-      permissionId TEXT NOT NULL,
-      effect TEXT NOT NULL DEFAULT 'allow',
-      PRIMARY KEY (userId, permissionId),
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (permissionId) REFERENCES permissions(id) ON DELETE CASCADE
+      userId STRING NOT NULL,
+      permissionId STRING NOT NULL,
+      effect STRING NOT NULL DEFAULT 'allow',
+      PRIMARY KEY (userId, permissionId)
     );
 
     CREATE TABLE IF NOT EXISTS access_audit_logs (
-      id TEXT PRIMARY KEY,
-      actorId TEXT NOT NULL,
-      targetUserId TEXT NOT NULL,
-      action TEXT NOT NULL,
-      permissionKey TEXT,
-      oldValue TEXT,
-      newValue TEXT,
-      createdAt TEXT NOT NULL
+      id STRING PRIMARY KEY,
+      actorId STRING NOT NULL,
+      targetUserId STRING NOT NULL,
+      action STRING NOT NULL,
+      permissionKey STRING,
+      oldValue STRING,
+      newValue STRING,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS orders (
-      id TEXT PRIMARY KEY,
-      invoiceNo TEXT UNIQUE NOT NULL,
-      vendorInvoiceNo TEXT UNIQUE NOT NULL,
-      customerId TEXT NOT NULL,
-      orderDate TEXT NOT NULL,
-      jenisOrder TEXT NOT NULL DEFAULT 'aqiqah',
-      atasNama TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'waiting_review',
-      quotationPrice REAL,
-      approvedAt TEXT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (customerId) REFERENCES users(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      invoiceNo STRING UNIQUE NOT NULL,
+      vendorInvoiceNo STRING UNIQUE NOT NULL,
+      customerId STRING NOT NULL,
+      orderDate STRING NOT NULL,
+      jenisOrder STRING NOT NULL DEFAULT 'aqiqah',
+      atasNama STRING NOT NULL,
+      status STRING NOT NULL DEFAULT 'waiting_review',
+      quotationPrice NUMERIC,
+      approvedAt STRING,
+      createdAt STRING NOT NULL,
+      updatedAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS order_details (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      parentName TEXT NOT NULL,
-      childName TEXT NOT NULL,
-      recipientName TEXT NOT NULL,
-      address TEXT NOT NULL,
-      deliveryDate TEXT NOT NULL,
-      deliveryTime TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      driverInfo TEXT,
-      driverFee REAL DEFAULT 0,
-      animalOrder TEXT NOT NULL,
-      kandangNote TEXT,
-      dapurAMasakan TEXT,
-      dapurANasiBox TEXT,
-      dapurANote TEXT,
-      dapurRMasakan TEXT,
-      dapurRNasiBox TEXT,
-      dapurRNote TEXT,
-      pesananLainnya TEXT,
-      pesanKandang TEXT,
-      pesanDapurA TEXT,
-      pesanDapurR TEXT,
-      pesanDriver TEXT,
-      uangSakuDriver REAL DEFAULT 0,
-      paymentStatus TEXT NOT NULL DEFAULT 'dp',
-      totalPelunasan REAL NOT NULL DEFAULT 0,
-      totalBayar REAL NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      parentName STRING NOT NULL,
+      childName STRING NOT NULL,
+      recipientName STRING NOT NULL,
+      address STRING NOT NULL,
+      deliveryDate STRING NOT NULL,
+      deliveryTime STRING NOT NULL,
+      phone STRING NOT NULL,
+      driverInfo STRING,
+      driverFee NUMERIC DEFAULT 0,
+      animalOrder STRING NOT NULL,
+      kandangNote STRING,
+      dapurAMasakan STRING,
+      dapurANasiBox STRING,
+      dapurANote STRING,
+      dapurRMasakan STRING,
+      dapurRNasiBox STRING,
+      dapurRNote STRING,
+      fatherName STRING,
+      motherName STRING,
+      pesananLainnya STRING,
+      pesanKandang STRING,
+      pesanDapurA STRING,
+      pesanDapurR STRING,
+      pesanDriver STRING,
+      uangSakuDriver NUMERIC DEFAULT 0,
+      paymentStatus STRING NOT NULL DEFAULT 'dp',
+      totalPelunasan NUMERIC NOT NULL DEFAULT 0,
+      totalBayar NUMERIC NOT NULL DEFAULT 0,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS order_items (
-      id TEXT PRIMARY KEY,
-      orderId TEXT NOT NULL,
-      animalOrder TEXT NOT NULL,
-      kandangNote TEXT,
-      dapurAMasakan TEXT,
-      dapurANasiBox TEXT,
-      dapurANote TEXT,
-      dapurRMasakan TEXT,
-      dapurRNasiBox TEXT,
-      dapurRNote TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING NOT NULL,
+      animalOrder STRING NOT NULL,
+      kandangNote STRING,
+      dapurAMasakan STRING,
+      dapurANasiBox STRING,
+      dapurANote STRING,
+      dapurRMasakan STRING,
+      dapurRNasiBox STRING,
+      dapurRNote STRING,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS quotations (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      adminId TEXT NOT NULL,
-      price REAL NOT NULL,
-      note TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (adminId) REFERENCES users(id)
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      adminId STRING NOT NULL,
+      price NUMERIC NOT NULL,
+      note STRING,
+      status STRING NOT NULL DEFAULT 'pending',
+      createdAt STRING NOT NULL,
+      updatedAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS reviews (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      customerId TEXT NOT NULL,
-      rating INTEGER NOT NULL,
-      comment TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (customerId) REFERENCES users(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      customerId STRING NOT NULL,
+      rating INT NOT NULL,
+      comment STRING NOT NULL,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS kandang_orders (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      animalType TEXT NOT NULL,
-      animalQty INTEGER NOT NULL,
-      slaughterSchedule TEXT NOT NULL,
-      notes TEXT,
-      prepStatus TEXT NOT NULL DEFAULT 'pending',
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      animalType STRING NOT NULL,
+      animalQty INT NOT NULL,
+      slaughterSchedule STRING NOT NULL,
+      notes STRING,
+      prepStatus STRING NOT NULL DEFAULT 'pending',
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS dapur_orders (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      menu TEXT NOT NULL,
-      portion TEXT NOT NULL,
-      cookingSchedule TEXT NOT NULL,
-      notes TEXT,
-      kitchenStatus TEXT NOT NULL DEFAULT 'waiting_cook',
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      menu STRING NOT NULL,
+      portion STRING NOT NULL,
+      cookingSchedule STRING NOT NULL,
+      notes STRING,
+      kitchenStatus STRING NOT NULL DEFAULT 'waiting_cook',
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS admin_orders (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      status_terkini TEXT NOT NULL DEFAULT 'monitoring',
-      monitoring_notes TEXT,
-      receivedAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      status_terkini STRING NOT NULL DEFAULT 'monitoring',
+      monitoring_notes STRING,
+      receivedAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS driver_orders (
-      id TEXT PRIMARY KEY,
-      orderId TEXT UNIQUE NOT NULL,
-      deliveryAddress TEXT NOT NULL,
-      contactPerson TEXT NOT NULL,
-      deliverySchedule TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'assigned',
-      receivedAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
-     );
+      id STRING PRIMARY KEY,
+      orderId STRING UNIQUE NOT NULL,
+      driverId STRING,
+      deliveryAddress STRING NOT NULL,
+      contactPerson STRING NOT NULL,
+      deliverySchedule STRING NOT NULL,
+      status STRING NOT NULL DEFAULT 'assigned',
+      arrivedAt STRING,
+      deliveredAt STRING,
+      deliveryProof STRING,
+      deliveryNote STRING,
+      receivedAt STRING NOT NULL
+    );
 
     CREATE TABLE IF NOT EXISTS payments (
-      id TEXT PRIMARY KEY,
-      orderId TEXT NOT NULL,
-      customerId TEXT NOT NULL,
-      paymentType TEXT NOT NULL,
-      amount REAL NOT NULL,
-      paymentMethod TEXT NOT NULL,
-      paymentDate TEXT NOT NULL,
-      proof TEXT,
-      status TEXT NOT NULL DEFAULT 'waiting_verification',
-      verifiedBy TEXT,
-      verifiedAt TEXT,
-      rejectionReason TEXT,
-      notes TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (customerId) REFERENCES users(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      orderId STRING NOT NULL,
+      customerId STRING NOT NULL,
+      paymentType STRING NOT NULL,
+      amount NUMERIC NOT NULL,
+      paymentMethod STRING NOT NULL,
+      paymentDate STRING NOT NULL,
+      proof STRING,
+      status STRING NOT NULL DEFAULT 'waiting_verification',
+      verifiedBy STRING,
+      verifiedAt STRING,
+      rejectionReason STRING,
+      notes STRING,
+      createdAt STRING NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      category TEXT NOT NULL,
-      title TEXT NOT NULL,
-      message TEXT NOT NULL,
-      priority TEXT NOT NULL DEFAULT 'medium',
-      actionUrl TEXT,
-      relatedEntityId TEXT,
-      readAt TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      id STRING PRIMARY KEY,
+      userId STRING NOT NULL,
+      category STRING NOT NULL,
+      title STRING NOT NULL,
+      message STRING NOT NULL,
+      priority STRING NOT NULL DEFAULT 'medium',
+      actionUrl STRING,
+      relatedEntityId STRING,
+      readAt STRING,
+      createdAt STRING NOT NULL
     );
-  `);
+    `);
   } catch {}
 
-  // Seed default users & permissions if empty
+  // Restore persisted data if available
+  restoreDb();
+
+  // Check if users exist; if not, seed default data
   const userCountStmt = db.prepare('SELECT COUNT(*) as count FROM users');
-  const userResult = userCountStmt.get() as { count: number };
-  if (userResult.count === 0) {
+  const userResult = userCountStmt.get() as { count: number } | undefined;
+  if (!userResult || !userResult.count || userResult.count === 0) {
     seedDefaultData();
   }
-
-  // Ensure master_admin role and default users exist even if db already existed
-  try {
-    const masterRole = db.prepare('SELECT id FROM roles WHERE name = ?').get('master_admin');
-    if (!masterRole) {
-      const now = new Date().toISOString();
-      db.prepare('INSERT INTO roles (id, name, description, isSystemRole, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)').run(
-        'role-master-admin',
-        'master_admin',
-        'Master Administrator (Full System Access)',
-        now,
-        now
-      );
-      const allPerms = db.prepare('SELECT id FROM permissions').all() as any[];
-      const insertRolePerm = db.prepare('INSERT OR IGNORE INTO role_permissions (roleId, permissionId) VALUES (?, ?)');
-      allPerms.forEach(p => {
-        insertRolePerm.run('role-master-admin', p.id);
-      });
-    }
-
-    const defaultUsers = [
-      { id: 'usr-master-1', name: 'Master Admin Almeera', email: 'master@almeera.com', phone: '081234567888', role: 'master_admin' },
-      { id: 'usr-admin-1', name: 'Admin Almeera', email: 'admin@almeera.com', phone: '081234567891', role: 'admin' },
-      { id: 'usr-kandang-1', name: 'Pak Slamet (Kandang)', email: 'kandang@almeera.com', phone: '081234567892', role: 'kandang' },
-      { id: 'usr-dapur-1', name: 'Chef Siti (Dapur)', email: 'dapur@almeera.com', phone: '081234567893', role: 'dapur' },
-      { id: 'usr-driver-1', name: 'Joko (Driver)', email: 'driver@almeera.com', phone: '081234567894', role: 'driver' },
-      { id: 'usr-customer-1', name: 'Budi Santoso', email: 'customer@almeera.com', phone: '081234567890', role: 'customer' },
-    ];
-
-    const now = new Date().toISOString();
-    const hashedPassword = hashPassword('password123');
-    const checkUser = db.prepare('SELECT id FROM users WHERE email = ?');
-    const insertDefUser = db.prepare(`
-      INSERT INTO users (id, name, email, password, phone, role, status, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-    `);
-
-    defaultUsers.forEach(u => {
-      const existing = checkUser.get(u.email);
-      if (!existing) {
-        insertDefUser.run(u.id, u.name, u.email, hashedPassword, u.phone, u.role, now, now);
-      }
-    });
-  } catch {}
 }
 
 function seedDefaultData() {
@@ -463,27 +459,19 @@ function seedDefaultData() {
   const insertRolePerm = db.prepare('INSERT INTO role_permissions (roleId, permissionId) VALUES (?, ?)');
 
   allPerms.forEach(p => {
-    // Master Admin gets everything
     insertRolePerm.run('role-master-admin', p.id);
-
-    // Admin gets operational permissions (everything except roles.* and access.*)
     if (!p.key.startsWith('roles.') && !p.key.startsWith('access.')) {
       insertRolePerm.run('role-admin', p.id);
     }
-
-    // Kandang gets kandang & po.kandang
     if (p.key.startsWith('kandang.') || p.key.startsWith('po.kandang.') || p.key === 'orders.view') {
       insertRolePerm.run('role-kandang', p.id);
     }
-    // Dapur gets dapur & po.dapur
     if (p.key.startsWith('dapur.') || p.key.startsWith('po.dapur_') || p.key === 'orders.view') {
       insertRolePerm.run('role-dapur', p.id);
     }
-    // Driver gets driver & po.driver
     if (p.key.startsWith('driver.') || p.key.startsWith('po.driver.') || p.key === 'orders.view') {
       insertRolePerm.run('role-driver', p.id);
     }
-    // Customer gets orders.create, orders.view
     if (['orders.create', 'orders.view', 'quotations.view', 'quotations.approve', 'quotations.reject'].includes(p.key)) {
       insertRolePerm.run('role-customer', p.id);
     }
@@ -495,21 +483,14 @@ function seedDefaultData() {
     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
   `);
 
-  const customerId = 'usr-customer-1';
-  const masterAdminId = 'usr-master-1';
-  const adminId = 'usr-admin-1';
-  const kandangId = 'usr-kandang-1';
-  const dapurId = 'usr-dapur-1';
-  const driverId = 'usr-driver-1';
+  insertUser.run('usr-customer-1', 'Budi Santoso', 'customer@almeera.com', hashedPassword, '081234567890', 'customer', now, now);
+  insertUser.run('usr-master-1', 'Master Admin Almeera', 'master@almeera.com', hashedPassword, '081234567888', 'master_admin', now, now);
+  insertUser.run('usr-admin-1', 'Admin Almeera', 'admin@almeera.com', hashedPassword, '081234567891', 'admin', now, now);
+  insertUser.run('usr-kandang-1', 'Pak Slamet (Kandang)', 'kandang@almeera.com', hashedPassword, '081234567892', 'kandang', now, now);
+  insertUser.run('usr-dapur-1', 'Chef Siti (Dapur)', 'dapur@almeera.com', hashedPassword, '081234567893', 'dapur', now, now);
+  insertUser.run('usr-driver-1', 'Joko (Driver)', 'driver@almeera.com', hashedPassword, '081234567894', 'driver', now, now);
 
-  insertUser.run(customerId, 'Budi Santoso', 'customer@almeera.com', hashedPassword, '081234567890', 'customer', now, now);
-  insertUser.run(masterAdminId, 'Master Admin Almeera', 'master@almeera.com', hashedPassword, '081234567888', 'master_admin', now, now);
-  insertUser.run(adminId, 'Admin Almeera', 'admin@almeera.com', hashedPassword, '081234567891', 'admin', now, now);
-  insertUser.run(kandangId, 'Pak Slamet (Kandang)', 'kandang@almeera.com', hashedPassword, '081234567892', 'kandang', now, now);
-  insertUser.run(dapurId, 'Chef Siti (Dapur)', 'dapur@almeera.com', hashedPassword, '081234567893', 'dapur', now, now);
-  insertUser.run(driverId, 'Joko (Driver)', 'driver@almeera.com', hashedPassword, '081234567894', 'driver', now, now);
-
-  // Seed sample orders across different statuses
+  // 4. Seed sample orders
   const statuses = [
     'waiting_review',
     'quotation_sent',
@@ -537,7 +518,7 @@ function seedDefaultData() {
       orderId,
       invoiceNo,
       vendorInvoiceNo,
-      customerId,
+      'usr-customer-1',
       now,
       'aqiqah',
       atasNama,
@@ -552,8 +533,9 @@ function seedDefaultData() {
       INSERT INTO order_details (
         id, orderId, parentName, childName, recipientName, address, deliveryDate, deliveryTime, phone, driverInfo, driverFee,
         animalOrder, kandangNote, dapurAMasakan, dapurANasiBox, dapurANote, dapurRMasakan, dapurRNasiBox, dapurRNote,
+        fatherName, motherName, pesananLainnya, pesanKandang, pesanDapurA, pesanDapurR, pesanDriver, uangSakuDriver,
         paymentStatus, totalPelunasan, totalBayar, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     insertDetail.run(
       `det-${idx + 1}`,
@@ -575,6 +557,14 @@ function seedDefaultData() {
       'Sate Kambing 100 tusuk',
       'Kerupuk & Buah',
       'Manis sedang',
+      'Budi Santoso',
+      'Ani',
+      'Bonus kalender & sertifikat aqiqah',
+      'Pastikan tanduk utuh',
+      'Rempah sedang',
+      'Kemasan rapi',
+      'Kirim tepat waktu jam 9 pagi',
+      50000,
       idx % 2 === 0 ? 'lunas' : 'dp',
       price,
       idx % 2 === 0 ? price : price / 2,
@@ -586,7 +576,7 @@ function seedDefaultData() {
         INSERT INTO quotations (id, orderId, adminId, price, note, status, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, 'approved', ?, ?)
       `);
-      insertQuotation.run(`quo-${idx + 1}`, orderId, adminId, price, 'Penawaran resmi Aqiqah Almeera Cilacap', now, now);
+      insertQuotation.run(`quo-${idx + 1}`, orderId, 'usr-admin-1', price, 'Penawaran resmi Aqiqah Almeera Cilacap', now, now);
 
       const insertKandang = db.prepare(`
         INSERT INTO kandang_orders (id, orderId, animalType, animalQty, slaughterSchedule, notes, prepStatus, createdAt)
@@ -607,18 +597,20 @@ function seedDefaultData() {
       insertAdminOrd.run(`adm-ord-${idx + 1}`, orderId, now);
 
       const insertDriver = db.prepare(`
-        INSERT INTO driver_orders (id, orderId, deliveryAddress, contactPerson, deliverySchedule, status, receivedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO driver_orders (id, orderId, driverId, deliveryAddress, contactPerson, deliverySchedule, status, receivedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      insertDriver.run(`drv-${idx + 1}`, orderId, 'Jl. Flores No. 28, Cilacap', 'Budi Santoso', '2026-07-25 09:00 WIB', status === 'delivery' ? 'on_delivery' : status === 'completed' ? 'delivered' : 'assigned', now);
+      insertDriver.run(`drv-${idx + 1}`, orderId, 'usr-driver-1', 'Jl. Flores No. 28, Cilacap', 'Budi Santoso', '2026-07-25 09:00 WIB', status === 'delivery' ? 'on_delivery' : status === 'completed' ? 'delivered' : 'assigned', now);
     } else if (status === 'quotation_sent') {
       const insertQuotation = db.prepare(`
         INSERT INTO quotations (id, orderId, adminId, price, note, status, createdAt, updatedAt)
         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
       `);
-      insertQuotation.run(`quo-${idx + 1}`, orderId, adminId, price, 'Menunggu persetujuan shohibul qurban', now, now);
+      insertQuotation.run(`quo-${idx + 1}`, orderId, 'usr-admin-1', price, 'Menunggu persetujuan shohibul qurban', now, now);
     }
   });
+
+  persistDb();
 }
 
 export { db };
