@@ -30,13 +30,19 @@ export async function POST(
       }
       const bytes = await proofFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+      const ext = path.extname(proofFile.name) || '.jpg';
+      const mime = proofFile.type || 'image/jpeg';
+      try {
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const filename = `pay-${orderId}-${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(uploadDir, filename), buffer);
+        proof = `/uploads/${filename}`;
+      } catch {
+        proof = `data:${mime};base64,${buffer.toString('base64')}`;
       }
-      const filename = `pay-${orderId}-${Date.now()}${path.extname(proofFile.name) || '.jpg'}`;
-      fs.writeFileSync(path.join(uploadDir, filename), buffer);
-      proof = `/uploads/${filename}`;
     }
 
     if (!paymentType || isNaN(amount) || !paymentMethod || !paymentDate) {

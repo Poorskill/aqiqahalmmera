@@ -4,13 +4,37 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+const dataDir = isServerless ? '/tmp' : path.join(process.cwd(), 'data');
+
+try {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+} catch {
+  // Ignore read-only dir errors in serverless
 }
 
 const dbPath = path.join(dataDir, 'aqiqah.db');
-const db = new DatabaseSync(dbPath);
+
+// If running in serverless and template DB exists in bundle, copy to /tmp if not yet present
+if (isServerless) {
+  try {
+    const bundledDbPath = path.join(process.cwd(), 'data', 'aqiqah.db');
+    if (fs.existsSync(bundledDbPath) && !fs.existsSync(dbPath)) {
+      fs.copyFileSync(bundledDbPath, dbPath);
+    }
+  } catch {}
+}
+
+let db: DatabaseSync;
+try {
+  db = new DatabaseSync(dbPath);
+} catch {
+  // If opening in primary path fails, fallback to /tmp
+  const fallbackPath = path.join('/tmp', 'aqiqah.db');
+  db = new DatabaseSync(fallbackPath);
+}
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -34,8 +58,14 @@ export function verifyPassword(password: string, stored: string): boolean {
 export function initDb() {
   if (process.env.NEXT_PHASE === 'phase-production-build') return;
   try {
-    db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA busy_timeout = 5000;');
+    try {
+      db.exec('PRAGMA journal_mode = WAL;');
+    } catch {
+      try {
+        db.exec('PRAGMA journal_mode = DELETE;');
+      } catch {}
+    }
   } catch {}
 
   try {

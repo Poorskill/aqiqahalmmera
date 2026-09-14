@@ -47,16 +47,20 @@ export async function POST(request: Request) {
         return NextResponse.redirect(errorUrl('Ukuran foto terlalu besar (Maks 3MB)'), 303);
       }
 
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
       const buffer = Buffer.from(await file.arrayBuffer());
       const ext = path.extname(file.name) || '.jpg';
-      const filename = `profile-${user.id}-${Date.now()}${ext}`;
-      fs.writeFileSync(path.join(uploadDir, filename), buffer);
-      profileImageUrl = `/uploads/${filename}`;
+      const mime = file.type || 'image/jpeg';
+      try {
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const filename = `profile-${user.id}-${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(uploadDir, filename), buffer);
+        profileImageUrl = `/uploads/${filename}`;
+      } catch {
+        profileImageUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+      }
     }
 
     updateCustomerProfileService(user.id, {

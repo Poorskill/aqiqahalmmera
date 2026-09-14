@@ -55,15 +55,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
 
         const bytes = await proofFile.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
         const ext = path.extname(proofFile.name) || '.jpg';
-        const filename = `proof-delivery-${orderId}-${Date.now()}${ext}`;
-        fs.writeFileSync(path.join(uploadDir, filename), buffer);
-        deliveryProof = `/uploads/${filename}`;
+        const mime = proofFile.type || 'image/jpeg';
+        try {
+          const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          const filename = `proof-delivery-${orderId}-${Date.now()}${ext}`;
+          fs.writeFileSync(path.join(uploadDir, filename), buffer);
+          deliveryProof = `/uploads/${filename}`;
+        } catch {
+          // On read-only serverless filesystem (e.g. Vercel), store as Data URL
+          deliveryProof = `data:${mime};base64,${buffer.toString('base64')}`;
+        }
       }
 
       if (!deliveryProof) {
