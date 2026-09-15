@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { startPostgresDelivery } from '@/lib/postgres-delivery';
+import { getPostgresOrderById } from '@/lib/postgres-services';
 import { markPostgresDriverArrived, completePostgresDelivery } from '@/lib/postgres-mutations';
 import { updateDriverStatusService, markDriverArrived, completeDeliveryService, getOrderById } from '@/lib/services';
 import path from 'node:path';
@@ -10,7 +11,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
   const { orderId } = await params;
   try {
     const user = await requireAuth(['driver', 'admin', 'master_admin']);
-    const order = getOrderById(orderId);
+    const order = (await getPostgresOrderById(orderId)) || getOrderById(orderId);
 
     if (!order) {
       return NextResponse.redirect(new URL(`/driver/dashboard?error=${encodeURIComponent('Pesanan tidak ditemukan.')}`, request.url), { status: 303 });
