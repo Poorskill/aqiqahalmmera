@@ -41,6 +41,10 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL(errUrl, request.url));
     }
 
+    const totalPelunasan = parseFloat(formData.get('totalPelunasan') as string) || 0;
+    const totalBayar = parseFloat(formData.get('totalBayar') as string) || 0;
+    const isManual = user.role === 'admin' || user.role === 'master_admin';
+
     const order = await createPostgresOrder(user.role === 'admin' ? (formData.get('customerId') as string || user.id) : user.id, {
       invoiceNo: invoiceNo || `INV-MGR-${Date.now().toString().slice(-6)}`,
       jenisOrder,
@@ -56,9 +60,15 @@ export async function POST(request: Request) {
       phone,
       pesananLainnya,
       items,
-      paymentStatus: formData.get('paymentStatus') as string || 'dp',
-      totalPelunasan: parseFloat(formData.get('totalPelunasan') as string) || 0,
-      totalBayar: parseFloat(formData.get('totalBayar') as string) || 0,
+      paymentStatus: formData.get('paymentStatus') as string || (totalBayar >= totalPelunasan && totalPelunasan > 0 ? 'lunas' : 'dp'),
+      totalPelunasan,
+      totalBayar,
+      manual: isManual,
+      pesanKandang: (formData.get('pesanKandang') as string) || '',
+      pesanDapurA: (formData.get('pesanDapurA') as string) || '',
+      pesanDapurR: (formData.get('pesanDapurR') as string) || '',
+      pesanDriver: (formData.get('pesanDriver') as string) || '',
+      uangSakuDriver: parseFloat(formData.get('uangSakuDriver') as string) || 0,
     });
 
     if (!order) {

@@ -6,12 +6,17 @@ import { DeliverySlotPicker } from '@/components/ui/DeliverySlotPicker';
 
 export function AdminNewOrderForm() {
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [totalPelunasan, setTotalPelunasan] = useState(2500000);
+  const [totalBayar, setTotalBayar] = useState(500000);
+
+  const sisaBayar = Math.max(0, totalPelunasan - totalBayar);
 
   return (
     <form action="/api/orders/create" method="POST" className="bg-white border border-stone-200/80 rounded-2xl p-8 space-y-8 shadow-sm">
       <div className="border-b border-stone-100 pb-4">
         <span className="text-xs font-semibold text-amber-800 tracking-wider uppercase">Formulir Pesanan Manual</span>
         <h3 className="text-xl font-bold tracking-tight text-stone-900 mt-0.5">Input Pesanan Offline / Vendor</h3>
+        <p className="text-xs text-stone-500 mt-1">Nominal harga langsung otomatis menjadi tagihan resmi pesanan tanpa melalui negosiasi ulang.</p>
       </div>
 
       {/* Section 1 */}
@@ -149,12 +154,26 @@ export function AdminNewOrderForm() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1">Total Pelunasan (Rp)</label>
-            <input type="number" name="totalPelunasan" defaultValue={2500000} className="w-full border border-stone-300 rounded-xl px-4 py-2.5 bg-white text-stone-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 text-sm font-medium" />
+            <input type="number" name="totalPelunasan" value={totalPelunasan} onChange={(e) => setTotalPelunasan(Number(e.target.value) || 0)} min="0" required className="w-full border border-stone-300 rounded-xl px-4 py-2.5 bg-white text-stone-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 text-sm font-medium" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1">Total Bayar (Rp)</label>
-            <input type="number" name="totalBayar" defaultValue={500000} className="w-full border border-stone-300 rounded-xl px-4 py-2.5 bg-white text-stone-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 text-sm font-medium" />
+            <input type="number" name="totalBayar" value={totalBayar} onChange={(e) => setTotalBayar(Number(e.target.value) || 0)} min="0" max={totalPelunasan} className="w-full border border-stone-300 rounded-xl px-4 py-2.5 bg-white text-stone-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 text-sm font-medium" />
           </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-xl bg-stone-50 border border-stone-200 p-4 text-sm">
+          <div><span className="text-xs text-stone-500 block">Total Harga</span><strong>Rp {totalPelunasan.toLocaleString('id-ID')}</strong></div>
+          <div><span className="text-xs text-stone-500 block">Sudah Dibayar</span><strong className="text-emerald-700">Rp {totalBayar.toLocaleString('id-ID')}</strong></div>
+          <div><span className="text-xs text-stone-500 block">Sisa Pembayaran</span><strong className="text-amber-800">Rp {sisaBayar.toLocaleString('id-ID')}</strong></div>
+        </div>
+        <div className="space-y-3">
+          <h5 className="text-xs font-semibold uppercase tracking-wider text-stone-700">Pesan Operasional Internal</h5>
+          <p className="text-xs text-stone-500">Catatan ini hanya untuk tim internal dan tidak menambah total tagihan customer.</p>
+          <textarea name="pesanKandang" rows={2} placeholder="Pesan untuk tim kandang" className="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm" />
+          <textarea name="pesanDapurA" rows={2} placeholder="Pesan untuk Dapur A" className="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm" />
+          <textarea name="pesanDapurR" rows={2} placeholder="Pesan untuk Dapur R" className="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm" />
+          <textarea name="pesanDriver" rows={2} placeholder="Pesan untuk driver" className="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm" />
+          <input type="number" name="uangSakuDriver" min="0" defaultValue="0" placeholder="Uang saku driver (internal)" className="w-full border border-stone-300 rounded-xl px-4 py-2.5 text-sm" />
         </div>
       </div>
 
