@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrderById, getPostgresPaymentsByOrderId } from '@/lib/postgres-services';
 import { getOrderById, getPaymentsByOrderId } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -18,17 +19,16 @@ export default async function CustomerOrderDetailPage({
   const user = await requireAuth(['customer', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
-  const order = getOrderById(id);
-
-  if (!order) {
-    return <div className="p-8 font-bold">Pesanan tidak ditemukan.</div>;
+  let order = await getPostgresOrderById(id);
+  let payments: any[] = [];
+  if (order) {
+    payments = await getPostgresPaymentsByOrderId(order.id);
+  } else {
+    order = getOrderById(id);
+    if (order) payments = getPaymentsByOrderId(order.id);
   }
-
-  if (user.role === 'customer' && order.customerId !== user.id) {
-    return <div className="p-8 font-bold text-red-600">Akses ditolak: Anda tidak memiliki akses ke pesanan ini.</div>;
-  }
-
-  const payments = getPaymentsByOrderId(order.id);
+  if (!order) return <div className="p-8 font-bold">Pesanan tidak ditemukan.</div>;
+  if (user.role === 'customer' && order.customerId !== user.id) return <div className="p-8 font-bold text-red-600">Akses ditolak: Anda tidak memiliki akses ke pesanan ini.</div>;
   const totalVerifiedPaid = payments
     .filter((p: any) => p.status === 'verified')
     .reduce((sum: number, p: any) => sum + p.amount, 0);
@@ -316,7 +316,7 @@ export default async function CustomerOrderDetailPage({
                           <td className="py-3 px-3 text-xs text-stone-600">{p.paymentMethod} ({p.paymentDate})</td>
                           <td className="py-3 px-3">
                             {p.proof ? (
-                              <a href={p.proof} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-amber-700 hover:underline">
+                              <a href={p.proof.startsWith('http') || p.proof.startsWith('/uploads') ? p.proof : `/api/files/view?path=${encodeURIComponent(p.proof)}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-amber-700 hover:underline">
                                 Lihat Bukti
                               </a>
                             ) : '-'}

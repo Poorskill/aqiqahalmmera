@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { markPostgresNotificationRead } from '@/lib/postgres-feedback';
 import { markNotificationAsRead } from '@/lib/services';
 
 export async function POST(request: Request) {
@@ -9,7 +10,11 @@ export async function POST(request: Request) {
     const notificationId = formData.get('notificationId') as string;
 
     if (notificationId) {
-      markNotificationAsRead(notificationId, user.id);
+      try {
+        await markPostgresNotificationRead(notificationId, user.id);
+      } catch {
+        markNotificationAsRead(notificationId, user.id);
+      }
     }
 
     const redirectTo = request.headers.get('referer') || '/customer/notifications';

@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { verifyPaymentService } from '@/lib/services';
+import { verifyPostgresPayment } from '@/lib/postgres-mutations';
 import { NextResponse } from 'next/server';
 
 export async function POST(
@@ -13,7 +13,7 @@ export async function POST(
     const action = formData.get('action') as 'verify' | 'reject';
     const rejectionReason = formData.get('rejectionReason') as string;
 
-    verifyPaymentService(paymentId, user.id, action, rejectionReason);
+    await verifyPostgresPayment(paymentId, user.id, action, rejectionReason);
 
     return NextResponse.redirect(new URL(`/admin/payments?success=Pembayaran berhasil ${action === 'verify' ? 'diverifikasi' : 'ditolak'}.`, request.url), { status: 303 });
   } catch (err: any) {

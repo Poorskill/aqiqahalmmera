@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getUserByEmail } from '@/lib/services';
+import { getPostgresUserByEmail } from '@/lib/postgres-auth';
 import { createSession } from '@/lib/auth';
 import { verifyPassword } from '@/lib/db';
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL('/login?error=Email dan password wajib diisi', request.url));
     }
 
-    const user = getUserByEmail(email);
+    const user = await getPostgresUserByEmail(email);
     if (!user || !verifyPassword(password, user.password)) {
       return NextResponse.redirect(new URL('/login?error=Email atau password salah', request.url));
     }

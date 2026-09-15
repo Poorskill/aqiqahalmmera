@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createUser, getUserByEmail, logAudit } from '@/lib/services';
+import { createPostgresUser, getPostgresUserByEmail } from '@/lib/postgres-auth';
+import { queryPostgres } from '@/lib/postgres';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
       throw new Error('Semua kolom wajib diisi.');
     }
 
-    const existing = getUserByEmail(email);
+    const existing = await getPostgresUserByEmail(email);
     if (existing) {
       throw new Error('Email tersebut sudah terdaftar di dalam sistem.');
     }
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       throw new Error('Role tidak valid untuk pendaftaran staff.');
     }
 
-    const newStaff = createUser({
+    const newStaff = await createPostgresUser({
       name,
       email,
       password,
@@ -33,7 +34,11 @@ export async function POST(request: Request) {
       role,
     });
 
-    logAudit(adminUser.id, 'CREATE_STAFF', 'users', newStaff.id, undefined, `name:${name}, email:${email}, role:${role}`);
+    if (!newStaff) throw new Error('Gagal membuat akun staff.');
+    await queryPostgres(
+      `INSERT INTO audit_logs (id, actor_id, action, entity, entity_id, new_value, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [`aud-${crypto.randomUUID()}`, adminUser.id, 'CREATE_STAFF', 'users', newStaff.id, `name:${name}, email:${email}, role:${role}`, new Date()],
+    );
 
     return NextResponse.redirect(new URL('/admin/staff?success=Staff baru berhasil ditambahkan', request.url));
   } catch (err: any) {

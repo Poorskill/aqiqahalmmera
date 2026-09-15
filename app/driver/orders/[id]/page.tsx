@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrderById } from '@/lib/postgres-services';
 import { getOrderById } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -16,7 +17,7 @@ export default async function DriverOrderDetailPage({
   const user = await requireAuth(['driver', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
-  const order = getOrderById(id);
+  const order = (await getPostgresOrderById(id)) || getOrderById(id);
 
   if (!order) {
     return (
@@ -267,9 +268,9 @@ export default async function DriverOrderDetailPage({
               {driver.deliveryProof && (
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-stone-900">Bukti Pengiriman</span>
-                  <a href={driver.deliveryProof} target="_blank" rel="noopener noreferrer">
+                  <a href={driver.deliveryProof.startsWith('http') || driver.deliveryProof.startsWith('/uploads') ? driver.deliveryProof : `/api/files/view?path=${encodeURIComponent(driver.deliveryProof)}`} target="_blank" rel="noopener noreferrer">
                     <img
-                      src={driver.deliveryProof}
+                      src={driver.deliveryProof.startsWith('http') || driver.deliveryProof.startsWith('/uploads') ? driver.deliveryProof : `/api/files/view?path=${encodeURIComponent(driver.deliveryProof)}`}
                       alt="Bukti Pengiriman"
                       className="w-48 h-36 object-cover rounded-xl border border-emerald-200 hover:opacity-90 transition-opacity"
                     />

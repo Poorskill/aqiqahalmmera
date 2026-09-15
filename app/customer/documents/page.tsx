@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getCustomerDocuments } from '@/lib/services';
+import { getPostgresCustomerDocuments } from '@/lib/postgres-reports';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ export default async function CustomerDocumentsPage({
   const filterType = sParams.type || 'all';
   const searchQuery = (sParams.search || '').toLowerCase();
 
-  const allDocs = getCustomerDocuments(user.id);
+  const allDocs = await getPostgresCustomerDocuments(user.id);
 
   const filteredDocs = allDocs.filter((doc) => {
     if (filterType !== 'all' && doc.type !== filterType) return false;

@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllOrders, getAllPayments } from '@/lib/services';
+import { getPostgresOrders } from '@/lib/postgres-services';
+import { getAllPostgresPayments } from '@/lib/postgres-reports';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboardPage() {
   const user = await requireAuth(['admin', 'master_admin']);
-  const orders = getAllOrders();
+  const orders = await getPostgresOrders();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const currentMonthStr = todayStr.slice(0, 7);
@@ -46,7 +47,7 @@ export default async function AdminDashboardPage() {
     return delDate && delDate < todayStr && !['completed', 'cancelled'].includes(o.status);
   }).length;
 
-  const pendingPayments = getAllPayments({ status: 'waiting_verification' });
+  const pendingPayments = await getAllPostgresPayments({ status: 'waiting_verification' });
   const waitingReviewOrders = orders.filter(o => o.status === 'waiting_review');
   const overdueOrdersList = orders.filter(o => {
     const delDate = o.orderDetails?.deliveryDate;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { updateUserPermissionOverride } from '@/lib/services';
+import { updatePostgresUserPermissionOverride } from '@/lib/postgres-rbac';
 
 export async function POST(
   request: Request,
@@ -13,7 +13,7 @@ export async function POST(
     const permissionKey = formData.get('permissionKey') as string;
     const effect = formData.get('effect') as 'allow' | 'deny' | 'default';
 
-    updateUserPermissionOverride(id, permissionKey, effect === 'default' ? 'none' : effect, adminUser.id);
+    await updatePostgresUserPermissionOverride(id, permissionKey, effect === 'default' ? 'none' : effect, adminUser.id);
 
     return NextResponse.redirect(new URL(`/admin/staff/${id}?success=Override permission berhasil disimpan`, request.url));
   } catch (err: any) {

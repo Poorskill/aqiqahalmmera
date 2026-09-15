@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { updatePostgresProfile } from '@/lib/postgres-admin';
 import { updateCustomerProfileService } from '@/lib/services';
-import fs from 'node:fs';
 import path from 'node:path';
+import { uploadFile, publicFileUrl } from '@/lib/supabase-storage';
 
 export async function POST(request: Request) {
   try {
@@ -47,23 +48,13 @@ export async function POST(request: Request) {
         return NextResponse.redirect(errorUrl('Ukuran foto terlalu besar (Maks 3MB)'), 303);
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = path.extname(file.name) || '.jpg';
-      const mime = file.type || 'image/jpeg';
-      try {
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        const filename = `profile-${user.id}-${Date.now()}${ext}`;
-        fs.writeFileSync(path.join(uploadDir, filename), buffer);
-        profileImageUrl = `/uploads/${filename}`;
-      } catch {
-        profileImageUrl = `data:${mime};base64,${buffer.toString('base64')}`;
-      }
+      const ext = path.extname(file.name).toLowerCase() || '.jpg';
+      const storagePath = `profiles/${user.id}/${crypto.randomUUID()}${ext}`;
+      await uploadFile('profiles', storagePath, file);
+      profileImageUrl = publicFileUrl('profiles', storagePath);
     }
 
-    updateCustomerProfileService(user.id, {
+    await updatePostgresProfile(user.id, {
       name,
       phone,
       profileImageUrl,

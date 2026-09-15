@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrders } from '@/lib/postgres-services';
 import { getAllOrders } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -14,7 +15,10 @@ export default async function AdminOrdersPage({
 }) {
   const user = await requireAuth(['admin', 'master_admin']);
   const params = await searchParams;
-  const orders = getAllOrders({ search: params.search, status: params.status });
+  let orders = await getPostgresOrders({ search: params.search, status: params.status });
+  if (!orders || orders.length === 0) {
+    orders = getAllOrders({ search: params.search, status: params.status });
+  }
 
   return (
     <div className="min-h-screen flex">

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSlotCapacitiesForDate, getSlotOccupancyExcludingOrder } from '@/lib/services';
+import { getPostgresSlotCapacities } from '@/lib/postgres-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,14 +16,7 @@ export async function GET(request: Request) {
     if (!date) {
       return NextResponse.json({ error: 'Date is required' }, { status: 400 });
     }
-    if (exclude) {
-      const slots: Record<string, number> = {};
-      HOURLY_SLOTS.forEach((slot) => {
-        slots[slot] = getSlotOccupancyExcludingOrder(date, slot, exclude);
-      });
-      return NextResponse.json({ date, slots });
-    }
-    const slots = getSlotCapacitiesForDate(date);
+    const slots = await getPostgresSlotCapacities(date, exclude || undefined);
     return NextResponse.json({ date, slots });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 });

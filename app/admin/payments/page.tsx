@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllPayments } from '@/lib/services';
+import { getAllPostgresPayments } from '@/lib/postgres-reports';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -15,7 +15,7 @@ export default async function AdminPaymentsPage({
   const user = await requireAuth(['admin', 'master_admin']);
   const sParams = await searchParams;
   const statusFilter = sParams.status || '';
-  const payments = getAllPayments(statusFilter ? { status: statusFilter } : undefined);
+  const payments = await getAllPostgresPayments(statusFilter ? { status: statusFilter } : undefined);
 
   const pendingCount = payments.filter((p: any) => p.status === 'waiting_verification').length;
   const verifiedCount = payments.filter((p: any) => p.status === 'verified').length;
@@ -153,7 +153,7 @@ export default async function AdminPaymentsPage({
                         <td className="py-4 px-4">
                           {p.proof ? (
                             <a
-                              href={p.proof}
+                              href={p.proof.startsWith('http') || p.proof.startsWith('/uploads') ? p.proof : `/api/files/view?path=${encodeURIComponent(p.proof)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 transition-colors"

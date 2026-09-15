@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { updateUserRoleAndStatus } from '@/lib/services';
+import { updatePostgresStaffRoleStatus } from '@/lib/postgres-admin';
 
 export async function POST(
   request: Request,
@@ -13,7 +13,7 @@ export async function POST(
     const role = formData.get('role') as string;
     const status = formData.get('status') as string;
 
-    updateUserRoleAndStatus(id, role, status || 'active', adminUser.id);
+    await updatePostgresStaffRoleStatus(id, role, status || 'active', adminUser.id);
 
     return NextResponse.redirect(new URL(`/admin/staff/${id}?success=Status & role staff berhasil diperbarui`, request.url));
   } catch (err: any) {

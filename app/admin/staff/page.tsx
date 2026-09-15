@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllStaff } from '@/lib/services';
+import { getAllPostgresStaff } from '@/lib/postgres-reports';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -13,7 +13,7 @@ export default async function AdminStaffPage({
 }) {
   const user = await requireAuth(['master_admin']);
   const sParams = await searchParams;
-  const staffList = getAllStaff();
+  const staffList = await getAllPostgresStaff();
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">

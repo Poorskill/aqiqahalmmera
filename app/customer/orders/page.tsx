@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrders } from '@/lib/postgres-services';
 import { getAllOrders } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -8,7 +9,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function CustomerOrdersPage() {
   const user = await requireAuth(['customer']);
-  const rawOrders = getAllOrders({ customerId: user.id });
+  let rawOrders = await getPostgresOrders({ customerId: user.id });
+  if (!rawOrders || rawOrders.length === 0) {
+    rawOrders = getAllOrders({ customerId: user.id });
+  }
   const orders = JSON.parse(JSON.stringify(rawOrders));
 
   return (

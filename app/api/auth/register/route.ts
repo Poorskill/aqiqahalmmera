@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser, getUserByEmail } from '@/lib/services';
+import { createPostgresUser, getPostgresUserByEmail } from '@/lib/postgres-auth';
 import { createSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -14,12 +14,13 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL('/register?error=Semua kolom wajib diisi', request.url));
     }
 
-    const existing = getUserByEmail(email);
+    const existing = await getPostgresUserByEmail(email);
     if (existing) {
       return NextResponse.redirect(new URL('/register?error=Email sudah terdaftar', request.url));
     }
 
-    const newUser = createUser({ name, email, password, phone, role: 'customer' });
+    const newUser = await createPostgresUser({ name, email, password, phone, role: 'customer' });
+    if (!newUser) throw new Error('Gagal mendaftarkan pengguna ke PostgreSQL.');
     await createSession(newUser.id);
 
     return NextResponse.redirect(new URL('/customer/dashboard', request.url));

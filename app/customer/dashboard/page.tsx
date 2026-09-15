@@ -1,5 +1,7 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllOrders, getNotificationsByUserId, getUnreadNotificationCount } from '@/lib/services';
+import { getPostgresOrders } from '@/lib/postgres-services';
+import { getPostgresUnreadNotificationCount } from '@/lib/postgres-rbac';
+import { getAllOrders } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -21,8 +23,9 @@ const ACTIVE_STATUSES = [
 
 export default async function CustomerDashboardPage() {
   const user = await requireAuth(['customer']);
-  const orders = getAllOrders({ customerId: user.id });
-  const unreadCount = getUnreadNotificationCount(user.id);
+  let orders = await getPostgresOrders({ customerId: user.id });
+  if (!orders || orders.length === 0) orders = getAllOrders({ customerId: user.id });
+  const unreadCount = await getPostgresUnreadNotificationCount(user.id);
 
   const activeOrders = orders.filter((o) => ACTIVE_STATUSES.includes(o.status));
   const historyOrders = orders.filter((o) => !ACTIVE_STATUSES.includes(o.status));

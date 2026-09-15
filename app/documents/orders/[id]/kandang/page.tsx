@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrderById } from '@/lib/postgres-services';
 import { getOrderById } from '@/lib/services';
 import { PurchaseOrderDocument } from '@/components/documents/PurchaseOrderDocument';
 import { PrintButton } from '@/components/ui/PrintButton';
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function PoKandangPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth(['admin', 'master_admin', 'kandang']);
   const { id } = await params;
-  const order = getOrderById(id);
+  const order = (await getPostgresOrderById(id)) || getOrderById(id);
 
   if (!order) return <div className="p-8 font-bold">Pesanan tidak ditemukan.</div>;
 

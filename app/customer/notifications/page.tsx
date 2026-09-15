@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getNotificationsByUserId, getUnreadNotificationCount } from '@/lib/services';
+import { getPostgresNotifications, getPostgresUnreadNotificationCount } from '@/lib/postgres-rbac';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -15,8 +15,8 @@ export default async function CustomerNotificationsPage({
   const sParams = await searchParams;
   const filter = sParams.filter || 'all';
 
-  const allNotifications = getNotificationsByUserId(user.id);
-  const unreadCount = getUnreadNotificationCount(user.id);
+  const allNotifications = await getPostgresNotifications(user.id);
+  const unreadCount = await getPostgresUnreadNotificationCount(user.id);
 
   const filteredNotifications = allNotifications.filter((n) => {
     if (filter === 'unread' && n.readAt) return false;

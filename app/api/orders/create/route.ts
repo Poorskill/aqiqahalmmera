@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createOrderService } from '@/lib/services';
+import { createPostgresOrder } from '@/lib/postgres-orders';
 
 export async function POST(request: Request) {
   try {
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL(errUrl, request.url));
     }
 
-    const order = createOrderService(user.role === 'admin' ? (formData.get('customerId') as string || user.id) : user.id, {
+    const order = await createPostgresOrder(user.role === 'admin' ? (formData.get('customerId') as string || user.id) : user.id, {
       invoiceNo: invoiceNo || `INV-MGR-${Date.now().toString().slice(-6)}`,
       jenisOrder,
       atasNama,

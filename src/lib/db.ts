@@ -375,8 +375,23 @@ export function initDb() {
   const userCountStmt = db.prepare('SELECT COUNT(*) as count FROM users');
   const userResult = userCountStmt.get() as { count: number } | undefined;
   if (!userResult || !userResult.count || userResult.count === 0) {
-    seedDefaultData();
+    seedDefaultUsers();
   }
+}
+
+function seedDefaultUsers() {
+  const now = new Date().toISOString();
+  const hashedPassword = hashPassword('password123');
+  const insertUser = db.prepare(`
+    INSERT INTO users (id, name, email, password, phone, role, status, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+  `);
+  insertUser.run('usr-customer-1', 'Budi Santoso', 'customer@almeera.com', hashedPassword, '081234567890', 'customer', now, now);
+  insertUser.run('usr-master-1', 'Master Admin Almeera', 'master@almeera.com', hashedPassword, '081234567888', 'master_admin', now, now);
+  insertUser.run('usr-admin-1', 'Admin Almeera', 'admin@almeera.com', hashedPassword, '081234567891', 'admin', now, now);
+  insertUser.run('usr-kandang-1', 'Pak Slamet (Kandang)', 'kandang@almeera.com', hashedPassword, '081234567892', 'kandang', now, now);
+  insertUser.run('usr-dapur-1', 'Chef Siti (Dapur)', 'dapur@almeera.com', hashedPassword, '081234567893', 'dapur', now, now);
+  insertUser.run('usr-driver-1', 'Joko (Driver)', 'driver@almeera.com', hashedPassword, '081234567894', 'driver', now, now);
 }
 
 function seedDefaultData() {

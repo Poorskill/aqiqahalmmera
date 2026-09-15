@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { createQuotationService } from '@/lib/services';
+import { createPostgresQuotation } from '@/lib/postgres-operational';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.redirect(new URL(`/customer/orders/${id}?error=Harga quotation wajib diisi dengan angka valid`, request.url));
     }
 
-    createQuotationService(id, user.id, price, note || '', {
+    await createPostgresQuotation(id, user.id, price, note || '', {
       pesanKandang: pesanKandang || '',
       pesanDapurA: pesanDapurA || '',
       pesanDapurR: pesanDapurR || '',

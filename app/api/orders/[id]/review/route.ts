@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { createPostgresReview } from '@/lib/postgres-feedback';
 import { createReviewService, getOrderById } from '@/lib/services';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.redirect(new URL(`/customer/orders/${id}?error=Komentar ulasan wajib diisi`, request.url));
     }
 
-    createReviewService(id, user.id, rating, comment);
+    try {
+      await createPostgresReview(id, user.id, rating, comment);
+    } catch {
+      createReviewService(id, user.id, rating, comment);
+    }
     return NextResponse.redirect(new URL(`/customer/orders/${id}?success=Ulasan berhasil dikirim. Terima kasih!`, request.url));
   } catch (err: any) {
     return NextResponse.redirect(new URL(`/customer/orders/${await params.then(p => p.id)}?error=${encodeURIComponent(err.message)}`, request.url));

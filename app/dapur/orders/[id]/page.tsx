@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { getPostgresOrderById } from '@/lib/postgres-services';
 import { getOrderById } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -16,7 +17,7 @@ export default async function DapurOrderDetailPage({
   const user = await requireAuth(['dapur', 'admin', 'master_admin']);
   const { id } = await params;
   const qParams = await searchParams;
-  const order = getOrderById(id);
+  const order = (await getPostgresOrderById(id)) || getOrderById(id);
 
   if (!order) {
     return (

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { approvePostgresQuotation } from '@/lib/postgres-operational';
 import { approveQuotationService, getOrderById } from '@/lib/services';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +15,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new Error('Akses ditolak: Pesanan ini bukan milik Anda');
     }
 
-    approveQuotationService(id);
+    try {
+      await approvePostgresQuotation(id);
+    } catch {
+      approveQuotationService(id);
+    }
     return NextResponse.redirect(new URL(`/customer/orders/${id}?success=Penawaran berhasil disetujui & didistribusikan`, request.url));
   } catch (err: any) {
     return NextResponse.redirect(new URL(`/customer/orders/${await params.then(p => p.id)}?error=${encodeURIComponent(err.message)}`, request.url));

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { updateRolePermissions } from '@/lib/services';
+import { updatePostgresRolePermissions } from '@/lib/postgres-rbac';
 
 export async function POST(
   request: Request,
@@ -12,7 +12,7 @@ export async function POST(
     const formData = await request.formData();
     const permissions = formData.getAll('permissions') as string[];
 
-    updateRolePermissions(roleId, permissions, adminUser.id);
+    await updatePostgresRolePermissions(roleId, permissions, adminUser.id);
 
     return NextResponse.redirect(
       new URL(`/admin/access-management/${roleId}?success=Hak akses role berhasil diperbarui`, request.url)

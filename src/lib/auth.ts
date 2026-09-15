@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { getUserById, User } from './services';
+import { getPostgresUserById } from './postgres-auth';
 
 const SESSION_COOKIE_NAME = 'almeera_session';
 
@@ -24,7 +25,10 @@ export async function getCurrentUser(): Promise<User | null> {
     const cookieStore = await cookies();
     const userId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (!userId) return null;
-    const user = getUserById(userId);
+    let user = await getPostgresUserById(userId);
+    if (!user) {
+      user = getUserById(userId);
+    }
     if (!user) return null;
     if (user.status && user.status !== 'active') return null;
     return user;

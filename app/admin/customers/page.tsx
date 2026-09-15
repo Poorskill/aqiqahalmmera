@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllCustomers } from '@/lib/services';
+import { getAllPostgresCustomers } from '@/lib/postgres-reports';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminCustomersPage() {
   const user = await requireAuth(['master_admin']);
-  const customers = getAllCustomers();
+  const customers = await getAllPostgresCustomers();
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">
