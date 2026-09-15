@@ -35,11 +35,18 @@ export async function createPostgresPayment(orderId: string, customerId: string,
 
 export async function verifyPostgresPayment(paymentId: string, adminId: string, action: 'verify' | 'reject', rejectionReason?: string) {
   return withPostgresTransaction(async client => {
-    const payment = await client.query<{ order_id: string; customer_id: string; status: string }>('SELECT order_id, customer_id, status FROM payments WHERE id = $1 FOR UPDATE', [paymentId]);
+    const payment = await client.query<{ order_id: string; customer_id: string; status: string; amount: string; vendor_invoice_no: string; quotation_price: string | null }>('SELECT p.order_id, p.customer_id, p.status, p.amount, o.vendor_invoice_no, o.quotation_price FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = $1 FOR UPDATE', [paymentId]);
     if (!payment.rowCount) throw new Error('Pembayaran tidak ditemukan.');
     if (payment.rows[0].status !== 'waiting_verification') throw new Error('Pembayaran sudah diproses.');
     const nextStatus = action === 'verify' ? 'verified' : 'rejected';
-    await client.query('UPDATE payments SET status = $1, verified_by = $2, verified_at = $3, rejection_reason = $4 WHERE id = $5', [nextStatus, adminId, new Date(), action === 'reject' ? rejectionReason || null : null, paymentId]);
+    const now = new Date();
+    await client.query('UPDATE payments SET status = $1, verified_by = $2, verified_at = $3, rejection_reason = $4 WHERE id = $5', [nextStatus, adminId, now, action === 'reject' ? rejectionReason || null : null, paymentId]);
+    if (action === 'verify') {
+      const total = await client.query<{ total: string }>("SELECT COALESCE(SUM(amount), 0)::text AS total FROM payments WHERE order_id=$1 AND status='verified'", [payment.rows[0].order_id]);
+      const paid = Number(total.rows[0]?.total || 0);
+      const bill = Number(payment.rows[0].quotation_price || 0);
+      await client.query('UPDATE order_details SET total_bayar=$1, payment_status=$2 WHERE order_id=$3', [paid, bill > 0 && paid >= bill ? 'lunas' : 'dp', payment.rows[0].order_id]);
+    }
     await audit(client, adminId, action === 'verify' ? 'VERIFY_PAYMENT' : 'REJECT_PAYMENT', 'payments', paymentId, 'waiting_verification', nextStatus);
     await notify(client, { userId: payment.rows[0].customer_id, category: 'payment', title: action === 'verify' ? 'Pembayaran Terverifikasi' : 'Pembayaran Ditolak', message: action === 'verify' ? 'Pembayaran Anda telah diverifikasi.' : `Pembayaran Anda ditolak${rejectionReason ? `: ${rejectionReason}` : '.'}`, relatedEntityId: payment.rows[0].order_id });
   });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { startPostgresDelivery } from '@/lib/postgres-delivery';
 import { markPostgresDriverArrived, completePostgresDelivery } from '@/lib/postgres-mutations';
 import { updateDriverStatusService, markDriverArrived, completeDeliveryService, getOrderById } from '@/lib/services';
 import path from 'node:path';
@@ -29,10 +30,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const redirectTo = (formData.get('redirectTo') as string) || `/driver/orders/${orderId}`;
 
     if (action === 'start' || action === 'on_delivery') {
-      if (driverOrder.status === 'delivered') {
-        return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent('Pengiriman sudah selesai.')}`, request.url), { status: 303 });
+      try {
+        await startPostgresDelivery(orderId, user.id);
+      } catch {
+        updateDriverStatusService(orderId, 'on_delivery');
       }
-      updateDriverStatusService(orderId, 'on_delivery');
       return NextResponse.redirect(new URL(`${redirectTo}?success=${encodeURIComponent('Status diperbarui: Pengiriman sedang berjalan.')}`, request.url), { status: 303 });
     }
 
