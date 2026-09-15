@@ -54,18 +54,18 @@ export async function verifyPostgresPayment(paymentId: string, adminId: string, 
 
 export async function markPostgresDriverArrived(orderId: string, driverId: string) {
   return withPostgresTransaction(async client => {
-    const result = await client.query<{ status: string; arrived_at: string | null }>('SELECT status, arrived_at FROM driver_orders WHERE order_id = $1 AND driver_id = $2 FOR UPDATE', [orderId, driverId]);
+    const result = await client.query<{ status: string; arrived_at: string | null }>('SELECT status, arrived_at FROM driver_orders WHERE order_id = $1 AND (driver_id = $2 OR driver_id IS NULL) FOR UPDATE', [orderId, driverId]);
     if (!result.rowCount) throw new Error('Data pengiriman tidak ditemukan.');
     if (result.rows[0].status !== 'on_delivery') throw new Error('Pengiriman harus berstatus on_delivery.');
     if (result.rows[0].arrived_at) throw new Error('Driver sudah menandai tiba.');
-    await client.query('UPDATE driver_orders SET arrived_at = $1 WHERE order_id = $2', [new Date(), orderId]);
+    await client.query('UPDATE driver_orders SET driver_id = COALESCE(driver_id, $1), arrived_at = $2 WHERE order_id = $3', [driverId, new Date(), orderId]);
     await audit(client, driverId, 'driver_arrived', 'driver_orders', orderId);
   });
 }
 
 export async function completePostgresDelivery(orderId: string, driverId: string, deliveryProof: string, deliveryNote?: string) {
   return withPostgresTransaction(async client => {
-    const result = await client.query<{ status: string; arrived_at: string | null; customer_id: string; vendor_invoice_no: string }>('SELECT d.status, d.arrived_at, o.customer_id, o.vendor_invoice_no FROM driver_orders d JOIN orders o ON o.id = d.order_id WHERE d.order_id = $1 AND d.driver_id = $2 FOR UPDATE', [orderId, driverId]);
+    const result = await client.query<{ status: string; arrived_at: string | null; customer_id: string; vendor_invoice_no: string }>('SELECT d.status, d.arrived_at, o.customer_id, o.vendor_invoice_no FROM driver_orders d JOIN orders o ON o.id = d.order_id WHERE d.order_id = $1 AND (d.driver_id = $2 OR d.driver_id IS NULL) FOR UPDATE', [orderId, driverId]);
     if (!result.rowCount) throw new Error('Data pengiriman tidak ditemukan.');
     const row = result.rows[0];
     if (row.status === 'delivered') throw new Error('Pengiriman sudah diselesaikan.');
