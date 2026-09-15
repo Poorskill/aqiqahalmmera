@@ -13,7 +13,8 @@
     "lint": "eslint",
     "db:migrate": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/migrate-json-to-postgres.ts",
     "db:verify": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/verify-postgres.ts",
-    "db:seed": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/seed-postgres-roles.ts"
+    "db:seed": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/seed-postgres-roles.ts",
+    "db:secure": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/enable-rls.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
