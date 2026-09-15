@@ -6,6 +6,7 @@ import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { OrderStatusTimeline } from '@/components/ui/OrderStatusTimeline';
+import { DeleteOrderButton } from '@/components/ui/DeleteOrderButton';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +62,17 @@ export default async function CustomerOrderDetailPage({
               <span>{qParams.success}</span>
             </div>
           )}
+          {order.deletedAt && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-900 rounded-xl text-xs space-y-1 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-red-800">
+                <span className="material-symbols-outlined text-base">cancel</span>
+                <span>Pesanan Dibatalkan / Dihapus oleh Master Admin</span>
+              </div>
+              <p className="text-red-700">
+                Waktu: {new Date(order.deletedAt).toLocaleString('id-ID')} — Alasan: <strong className="font-semibold">{order.deleteReason || 'Tanpa keterangan spesifik'}</strong>
+              </p>
+            </div>
+          )}
 
           {/* Top Summary Card */}
           <div className="bg-white border border-stone-200/80 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
@@ -86,6 +98,18 @@ export default async function CustomerOrderDetailPage({
                   <span className="material-symbols-outlined text-sm">edit</span>
                   Edit Pesanan
                 </Link>
+              )}
+              {user.role === 'master_admin' && order.status !== 'cancelled' && (
+                <DeleteOrderButton
+                  orderId={order.id}
+                  vendorInvoiceNo={order.vendorInvoiceNo}
+                  customerName={order.atasNama}
+                  deliveryDate={order.orderDetails?.deliveryDate}
+                  status={order.status}
+                  hasVerifiedPayment={totalVerifiedPaid > 0}
+                  isDeliveryOrCompleted={order.status === 'delivery' || order.status === 'completed'}
+                  redirectTo="/admin/orders"
+                />
               )}
               {['admin', 'master_admin'].includes(user.role) && (
                 <Link

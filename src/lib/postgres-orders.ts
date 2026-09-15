@@ -97,3 +97,124 @@ export async function createPostgresOrder(customerId: string, data: {
     return { id: orderId, vendorInvoiceNo };
   });
 }
+
+export async function deletePostgresOrder(
+  orderId: string,
+  masterAdminId: string,
+  confirmation: string,
+  reason: string
+) {
+  return withPostgresTransaction(async client => {
+    await client.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ");
+    await client.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS deleted_by TEXT REFERENCES users(id)");
+    await client.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delete_reason TEXT");
+
+    const orderRes = await client.query<{
+      id: string;
+      invoice_no: string;
+      vendor_invoice_no: string;
+      customer_id: string;
+      status: string;
+      deleted_at: string | null;
+    }>('SELECT id, invoice_no, vendor_invoice_no, customer_id, status, deleted_at FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+
+    if (!orderRes.rowCount) {
+      throw new Error('Pesanan tidak ditemukan.');
+    }
+    const order = orderRes.rows[0];
+
+    if (order.deleted_at) {
+      throw new Error('Pesanan sudah dihapus sebelumnya.');
+    }
+
+    const trimmedConfirm = (confirmation || '').trim();
+    if (trimmedConfirm !== order.vendor_invoice_no.trim() && trimmedConfirm !== order.invoice_no.trim()) {
+      throw new Error(`Konfirmasi gagal: Nomor invoice "${trimmedConfirm}" tidak cocok dengan "${order.vendor_invoice_no}".`);
+    }
+
+    const trimmedReason = (reason || '').trim();
+    if (!trimmedReason || trimmedReason.length < 3) {
+      throw new Error('Alasan penghapusan wajib diisi (minimal 3 karakter).');
+    }
+
+    const verifiedPayments = await client.query<{ id: string; amount: string }>(
+      "SELECT id, amount FROM payments WHERE order_id = $1 AND status = 'verified'",
+      [orderId]
+    );
+    if (verifiedPayments.rowCount && verifiedPayments.rowCount > 0) {
+      throw new Error('Pesanan tidak dapat dihapus karena memiliki pembayaran yang telah diverifikasi (ledger keuangan).');
+    }
+
+    if (order.status === 'delivery') {
+      throw new Error('Pesanan tidak dapat dihapus karena sudah dalam proses pengiriman oleh driver.');
+    }
+    if (order.status === 'completed') {
+      throw new Error('Pesanan tidak dapat dihapus karena pengiriman telah selesai (completed).');
+    }
+
+    const now = new Date();
+
+    await client.query(
+      `UPDATE orders
+       SET status = 'cancelled',
+           deleted_at = $1,
+           deleted_by = $2,
+           delete_reason = $3,
+           updated_at = $1
+       WHERE id = $4`,
+      [now, masterAdminId, trimmedReason, orderId]
+    );
+
+    await client.query(
+      `UPDATE payments
+       SET status = 'rejected',
+           rejection_reason = $1,
+           verified_by = $2,
+           verified_at = $3
+       WHERE order_id = $4 AND status = 'waiting_verification'`,
+      [`Pesanan dibatalkan/dihapus oleh Master Admin: ${trimmedReason}`, masterAdminId, now, orderId]
+    );
+
+    await client.query(
+      `UPDATE driver_orders
+       SET status = 'assigned',
+           delivery_note = COALESCE(delivery_note, '') || ' [Dibatalkan Master Admin: ' || $1 || ']'
+       WHERE order_id = $2 AND status <> 'delivered'`,
+      [trimmedReason, orderId]
+    );
+
+    await client.query(
+      `INSERT INTO audit_logs (id, actor_id, action, entity, entity_id, old_value, new_value, created_at)
+       VALUES ($1, $2, 'DELETE_ORDER', 'orders', $3, $4, $5, $6)`,
+      [
+        `aud-${crypto.randomUUID()}`,
+        masterAdminId,
+        orderId,
+        `status:${order.status}, invoice:${order.vendor_invoice_no}`,
+        `status:cancelled, deleted_by:${masterAdminId}, reason:${trimmedReason}`,
+        now,
+      ]
+    );
+
+    await client.query(
+      `INSERT INTO notifications (id, user_id, category, title, message, priority, action_url, related_entity_id, created_at)
+       VALUES ($1, $2, 'pesanan', 'Pesanan Dibatalkan/Dihapus', $3, 'high', $4, $5, $6)`,
+      [
+        `not-${crypto.randomUUID()}`,
+        order.customer_id,
+        `Pesanan #${order.vendor_invoice_no} telah dibatalkan oleh Master Admin. Alasan: ${trimmedReason}`,
+        `/customer/orders/${orderId}`,
+        orderId,
+        now,
+      ]
+    );
+
+    return {
+      id: orderId,
+      vendorInvoiceNo: order.vendor_invoice_no,
+      status: 'cancelled',
+      deletedAt: now.toISOString(),
+      deleteReason: trimmedReason,
+    };
+  });
+}

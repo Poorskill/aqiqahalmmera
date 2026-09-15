@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS orders (
   status TEXT NOT NULL DEFAULT 'waiting_review' CHECK (status IN ('waiting_review', 'quotation_sent', 'quotation_approved', 'preparing', 'slaughtering', 'cooking', 'packaging', 'delivery', 'completed', 'cancelled')),
   quotation_price NUMERIC(14,2),
   approved_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  deleted_by TEXT REFERENCES users(id),
+  delete_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

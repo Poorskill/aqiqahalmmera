@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; error?: string; success?: string }>;
 }) {
   const user = await requireAuth(['admin', 'master_admin']);
   const params = await searchParams;
@@ -32,6 +32,19 @@ export default async function AdminOrdersPage({
         />
 
         <main className="p-8 space-y-6">
+          {params.error && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">error</span>
+              <span>{params.error}</span>
+            </div>
+          )}
+          {params.success && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span>{params.success}</span>
+            </div>
+          )}
+
           {/* Filters & Search */}
           <div className="brutalist-card p-6 bg-white flex flex-col md:flex-row items-center justify-between gap-4">
             <form method="GET" className="flex items-center gap-3 w-full md:w-auto flex-1">

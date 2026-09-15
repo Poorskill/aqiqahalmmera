@@ -27,7 +27,11 @@ function mapOrder(row: Record<string, any>, related: Record<string, any>): Order
   return {
     id: row.id, invoiceNo: row.invoice_no, vendorInvoiceNo: row.vendor_invoice_no, customerId: row.customer_id, orderDate: row.order_date,
      jenisOrder: row.jenis_order, orderType: row.order_type || 'ONLINE', atasNama: row.atas_nama, status: row.status, quotationPrice: row.quotation_price === null ? null : Number(row.quotation_price),
-    approvedAt: row.approved_at, createdAt: row.created_at, updatedAt: row.updated_at,
+    approvedAt: row.approved_at,
+    deletedAt: row.deleted_at || null,
+    deletedBy: row.deleted_by || null,
+    deleteReason: row.delete_reason || null,
+    createdAt: row.created_at, updatedAt: row.updated_at,
     customer: related.customer ? { name: related.customer.name, email: related.customer.email, phone: related.customer.phone } : undefined,
     orderDetails: detail, items: related.items || [], quotation: related.quotation, kandangOrder: related.kandang, dapurOrder: related.dapur,
     adminOrder: related.admin, driverOrder: related.driver, review: related.review,

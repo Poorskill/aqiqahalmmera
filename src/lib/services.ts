@@ -34,6 +34,9 @@ export interface OrderWithRelations {
   status: string;
   quotationPrice: number | null;
   approvedAt: string | null;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
   createdAt: string;
   updatedAt: string;
   customer?: { name: string; email: string; phone: string };
