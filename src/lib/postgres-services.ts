@@ -36,7 +36,9 @@ async function enrich(row: Record<string, any>) {
     queryPostgres('SELECT * FROM kandang_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM dapur_orders WHERE order_id=$1', [id]),
     queryPostgres('SELECT * FROM admin_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM driver_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM reviews WHERE order_id=$1', [id]),
   ]);
-  return mapOrder(row, { customer: customer.rows[0], detail: detail.rows[0], items: items.rows, quotation: quotation.rows[0], kandang: kandang.rows[0], dapur: dapur.rows[0], admin: admin.rows[0], driver: driver.rows[0], review: review.rows[0] });
+  const driverRow = driver.rows[0];
+  const driverOrder = driverRow ? { ...driverRow, orderId: driverRow.order_id, driverId: driverRow.driver_id, deliveryAddress: driverRow.delivery_address, contactPerson: driverRow.contact_person, deliverySchedule: driverRow.delivery_schedule, arrivedAt: driverRow.arrived_at, deliveredAt: driverRow.delivered_at, deliveryProof: driverRow.delivery_proof, deliveryNote: driverRow.delivery_note, receivedAt: driverRow.received_at } : undefined;
+  return mapOrder(row, { customer: customer.rows[0], detail: detail.rows[0], items: items.rows, quotation: quotation.rows[0], kandang: kandang.rows[0], dapur: dapur.rows[0], admin: admin.rows[0], driver: driverOrder, review: review.rows[0] });
 }
 
 export async function getPostgresOrderById(orderId: string) {
