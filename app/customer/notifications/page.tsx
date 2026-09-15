@@ -6,6 +6,23 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
+function formatTimeAgo(dateStr: string) {
+  try {
+    const diffMs = new Date().getTime() - new Date(dateStr).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Baru saja';
+    if (diffMins < 60) return `${diffMins} menit lalu`;
+    if (diffHours < 24) return `${diffHours} jam lalu`;
+    if (diffDays < 7) return `${diffDays} hari lalu`;
+    return new Date(dateStr).toLocaleDateString('id-ID', { dateStyle: 'medium' });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default async function CustomerNotificationsPage({
   searchParams,
 }: {
@@ -25,19 +42,6 @@ export default async function CustomerNotificationsPage({
     }
     return true;
   });
-
-  const formatTimeAgo = (dateStr: string) => {
-    const diffMs = Date.now() - new Date(dateStr).getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Baru saja';
-    if (diffMins < 60) return `${diffMins} menit lalu`;
-    if (diffHours < 24) return `${diffHours} jam lalu`;
-    if (diffDays < 7) return `${diffDays} hari lalu`;
-    return new Date(dateStr).toLocaleDateString('id-ID', { dateStyle: 'medium' });
-  };
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">

@@ -20,11 +20,8 @@ export function DeliverySlotPicker({ deliveryDate, selectedTime = '', excludeOrd
   const [currentTime, setCurrentTime] = useState(selectedTime);
 
   useEffect(() => {
-    if (!deliveryDate) {
-      setCapacities({});
-      return;
-    }
-    setLoading(true);
+    if (!deliveryDate) return;
+    queueMicrotask(() => setLoading(true));
     const qs = `/api/orders/slots?date=${encodeURIComponent(deliveryDate)}${excludeOrderId ? `&exclude=${encodeURIComponent(excludeOrderId)}` : ''}`;
     fetch(qs, { cache: 'no-store' })
       .then(res => res.json())

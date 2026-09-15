@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getPostgresDriverQueue } from '@/lib/postgres-queues';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -14,17 +14,7 @@ export default async function DriverDashboardPage({
   const user = await requireAuth(['driver', 'admin', 'master_admin']);
   const qParams = await searchParams;
 
-  const stmt = db.prepare(`
-    SELECT dr.*, o.vendorInvoiceNo, o.atasNama, o.status as orderStatus
-    FROM driver_orders dr
-    JOIN orders o ON dr.orderId = o.id
-    ORDER BY dr.receivedAt DESC
-  `);
-  const allDriverOrders = stmt.all() as any[];
-
-  const driverOrders = user.role === 'driver'
-    ? allDriverOrders.filter(d => !d.driverId || d.driverId === user.id)
-    : allDriverOrders;
+  const driverOrders = await getPostgresDriverQueue(user.role === 'driver' ? user.id : undefined);
 
   const pendingDelivery = driverOrders.filter(d => d.status === 'assigned' || d.status === 'on_delivery');
 

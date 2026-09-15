@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getPostgresAuditLogs } from '@/lib/postgres-audit';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 
@@ -15,29 +15,7 @@ export default async function AdminAuditPage({
   const actionFilter = sParams.action || '';
   const searchFilter = sParams.search || '';
 
-  let query = `
-    SELECT al.*, u.name as actorName, u.email as actorEmail, u.role as actorRole
-    FROM access_audit_logs al
-    LEFT JOIN users u ON al.actorId = u.id
-    WHERE 1=1
-  `;
-  const params: any[] = [];
-
-  if (actionFilter) {
-    query += ' AND al.action = ?';
-    params.push(actionFilter);
-  }
-
-  if (searchFilter) {
-    query += ' AND (al.action LIKE ? OR al.permissionKey LIKE ? OR al.oldValue LIKE ? OR al.newValue LIKE ?)';
-    const term = `%${searchFilter}%`;
-    params.push(term, term, term, term);
-  }
-
-  query += ' ORDER BY al.createdAt DESC LIMIT 100';
-  const logs = db.prepare(query).all(...params) as any[];
-
-  const actionsList = db.prepare('SELECT DISTINCT action FROM access_audit_logs').all() as { action: string }[];
+  const { logs, actionsList } = await getPostgresAuditLogs({ action: actionFilter, search: searchFilter });
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">

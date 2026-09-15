@@ -33,7 +33,7 @@ export default async function RegisterPage({
             Bergabung Bersama Kami
           </div>
           <h2 className="text-3xl lg:text-4xl font-bold tracking-tight text-stone-900 leading-snug">
-            Wujudkan Ibadah Aqiqah Penuh Berkah & Sesuai Syar'i
+            Wujudkan Ibadah Aqiqah Penuh Berkah & Sesuai Syar&apos;i
           </h2>
           <p className="text-stone-600 text-sm lg:text-base leading-relaxed">
             Daftarkan akun Anda untuk mulai membuat pesanan aqiqah, memantau persiapan hewan, sertifikat, hingga pengiriman dengan mudah dalam satu portal.

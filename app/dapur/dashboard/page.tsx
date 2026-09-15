@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getPostgresDapurQueue } from '@/lib/postgres-queues';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -8,13 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function DapurDashboardPage() {
   const user = await requireAuth(['dapur', 'admin', 'master_admin']);
-  const stmt = db.prepare(`
-    SELECT d.*, o.vendorInvoiceNo, o.atasNama, o.status as orderStatus
-    FROM dapur_orders d
-    JOIN orders o ON d.orderId = o.id
-    ORDER BY d.createdAt DESC
-  `);
-  const dapurOrders = stmt.all() as any[];
+  const dapurOrders = await getPostgresDapurQueue();
   const pendingCook = dapurOrders.filter(d => d.kitchenStatus === 'waiting_cook' || d.kitchenStatus === 'cooking');
 
   return (

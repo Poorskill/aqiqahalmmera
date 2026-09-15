@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllRoles, getRolePermissionKeys } from '@/lib/services';
+import { getPostgresAllRoles, getPostgresRolePermissionKeys } from '@/lib/postgres-access';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AccessManagementPage() {
   const user = await requireAuth(['master_admin']);
-  const roles = getAllRoles();
+  const roles = await getPostgresAllRoles();
+  const rolesWithPerms = await Promise.all(roles.map(async r => ({ ...r, permKeys: await getPostgresRolePermissionKeys(r.name) })));
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">
@@ -34,8 +35,8 @@ export default async function AccessManagementPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {roles.map((r) => {
-                const permKeys = getRolePermissionKeys(r.name);
+              {rolesWithPerms.map((r) => {
+                const permKeys = r.permKeys;
                 const isMaster = r.name === 'master_admin';
 
                 return (

@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getPostgresOperationalCalendar } from '@/lib/postgres-access';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -16,20 +16,7 @@ export default async function AdminCalendarPage({
   const sParams = await searchParams;
   const filter = sParams.filter || 'all';
 
-  const orders = db.prepare(`
-    SELECT o.id, o.vendorInvoiceNo, o.atasNama, o.status, o.jenisOrder,
-           od.deliveryDate, od.deliveryTime, od.recipientName, od.address,
-           k.animalType, k.animalQty, k.slaughterSchedule, k.prepStatus,
-           d.menu, d.portion, d.cookingSchedule, d.kitchenStatus,
-           drv.deliverySchedule, drv.status as driverStatus
-    FROM orders o
-    LEFT JOIN order_details od ON o.id = od.orderId
-    LEFT JOIN kandang_orders k ON o.id = k.orderId
-    LEFT JOIN dapur_orders d ON o.id = d.orderId
-    LEFT JOIN driver_orders drv ON o.id = drv.orderId
-    WHERE o.status NOT IN ('cancelled', 'completed')
-    ORDER BY od.deliveryDate ASC
-  `).all() as any[];
+  const orders = await getPostgresOperationalCalendar();
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">

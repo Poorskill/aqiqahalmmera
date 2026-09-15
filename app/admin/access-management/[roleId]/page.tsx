@@ -1,6 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { getAllPermissions, getRolePermissionKeys } from '@/lib/services';
-import { db } from '@/lib/db';
+import { getPostgresRoleById, getPostgresAllPermissions, getPostgresRolePermissionKeys } from '@/lib/postgres-access';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -19,11 +18,11 @@ export default async function AccessManagementDetailPage({
   const { roleId } = await params;
   const sParams = await searchParams;
 
-  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(roleId) as any;
+  const role = await getPostgresRoleById(roleId);
   if (!role) return <div className="min-h-screen flex items-center justify-center font-bold text-red-600">Role tidak ditemukan.</div>;
 
-  const permissions = getAllPermissions();
-  const assignedKeys = getRolePermissionKeys(role.name);
+  const permissions = await getPostgresAllPermissions();
+  const assignedKeys = await getPostgresRolePermissionKeys(role.name);
   const isMaster = role.name === 'master_admin';
 
   // Group by module

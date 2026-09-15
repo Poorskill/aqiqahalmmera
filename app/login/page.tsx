@@ -54,7 +54,7 @@ export default async function LoginPage({
             <div className="p-4 bg-white/80 backdrop-blur-xs border border-amber-900/10 rounded-2xl shadow-2xs space-y-1">
               <div className="flex items-center gap-2 text-amber-800 font-semibold text-xs uppercase tracking-wider">
                 <span className="material-symbols-outlined text-base">receipt_long</span>
-                Transparan & Syar'i
+                Transparan &amp; Syar&apos;i
               </div>
               <p className="text-xs text-stone-600 leading-normal">
                 Quotation dan rincian biaya jelas tanpa biaya tersembunyi.

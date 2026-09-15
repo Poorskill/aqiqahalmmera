@@ -615,7 +615,7 @@ export default async function CustomerOrderDetailPage({
                     {'★'.repeat(order.review.rating)}{'☆'.repeat(5 - order.review.rating)}
                     <span className="text-xs text-stone-600 ml-2">({order.review.rating}/5 Bintang)</span>
                   </div>
-                  <p className="text-sm font-medium text-stone-800">"{order.review.comment}"</p>
+                  <p className="text-sm font-medium text-stone-800">&quot;{order.review.comment}&quot;</p>
                 </div>
               ) : user.role === 'customer' ? (
                 <form action={`/api/orders/${order.id}/review`} method="POST" className="space-y-4">

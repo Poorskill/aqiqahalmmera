@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getPostgresKandangQueue } from '@/lib/postgres-queues';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
@@ -8,14 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function KandangDashboardPage() {
   const user = await requireAuth(['kandang', 'admin']);
-  const stmt = db.prepare(`
-    SELECT k.*, o.vendorInvoiceNo, o.atasNama, o.status as orderStatus, od.deliveryDate
-    FROM kandang_orders k
-    JOIN orders o ON k.orderId = o.id
-    LEFT JOIN order_details od ON o.id = od.orderId
-    ORDER BY k.createdAt DESC
-  `);
-  const kandangOrders = stmt.all() as any[];
+  const kandangOrders = await getPostgresKandangQueue();
 
   return (
     <div className="min-h-screen flex">
