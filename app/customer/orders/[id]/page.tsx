@@ -32,7 +32,7 @@ export default async function CustomerOrderDetailPage({
   if (user.role === 'customer' && order.customerId !== user.id) return <div className="p-8 font-bold text-red-600">Akses ditolak: Anda tidak memiliki akses ke pesanan ini.</div>;
   const totalVerifiedPaid = payments
     .filter((p: any) => p.status === 'verified')
-    .reduce((sum: number, p: any) => sum + p.amount, 0);
+    .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
 
   const totalBill = order.quotationPrice || order.orderDetails?.totalPelunasan || 0;
   const remainingBalance = Math.max(0, totalBill - totalVerifiedPaid);

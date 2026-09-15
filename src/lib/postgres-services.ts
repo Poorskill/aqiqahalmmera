@@ -57,5 +57,15 @@ export async function getPostgresOrders(filters?: { customerId?: string; status?
 
 export async function getPostgresPaymentsByOrderId(orderId: string) {
   const result = await queryPostgres('SELECT * FROM payments WHERE order_id=$1 ORDER BY created_at DESC', [orderId]);
-  return result.rows.map(row => ({ ...row, paymentType: row.payment_type, paymentMethod: row.payment_method, paymentDate: row.payment_date, verifiedBy: row.verified_by, verifiedAt: row.verified_at, rejectionReason: row.rejection_reason, createdAt: row.created_at }));
+  return result.rows.map(row => ({
+    ...row,
+    amount: Number(row.amount || 0),
+    paymentType: row.payment_type,
+    paymentMethod: row.payment_method,
+    paymentDate: row.payment_date,
+    verifiedBy: row.verified_by,
+    verifiedAt: row.verified_at,
+    rejectionReason: row.rejection_reason,
+    createdAt: row.created_at
+  }));
 }
