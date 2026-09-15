@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth';
 import { getPostgresOrderById, getPostgresPaymentsByOrderId } from '@/lib/postgres-services';
+import { resolveFileUrl } from '@/lib/supabase-storage';
 import { getOrderById, getPaymentsByOrderId } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
@@ -469,7 +470,7 @@ export default async function CustomerOrderDetailPage({
                 <div className="pt-2">
                   {payments.some((p: any) => p.proof && p.status === 'verified') ? (
                     <a
-                      href={payments.find((p: any) => p.proof && p.status === 'verified')?.proof}
+                      href={resolveFileUrl(payments.find((p: any) => p.proof && p.status === 'verified')?.proof)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs font-semibold text-amber-700 hover:underline flex items-center gap-1"
@@ -586,9 +587,9 @@ export default async function CustomerOrderDetailPage({
               {order.driverOrder.deliveryProof && (
                 <div className="pt-2">
                   <span className="text-xs font-semibold text-stone-900 block mb-1.5">Bukti Foto Penerimaan:</span>
-                  <a href={order.driverOrder.deliveryProof} target="_blank" rel="noopener noreferrer" className="inline-block">
+                  <a href={resolveFileUrl(order.driverOrder.deliveryProof)} target="_blank" rel="noopener noreferrer" className="inline-block">
                     <img
-                      src={order.driverOrder.deliveryProof}
+                      src={resolveFileUrl(order.driverOrder.deliveryProof)}
                       alt="Bukti Penerimaan"
                       className="w-48 h-36 object-cover rounded-xl border border-stone-300 hover:opacity-90 shadow-xs transition-opacity"
                     />
