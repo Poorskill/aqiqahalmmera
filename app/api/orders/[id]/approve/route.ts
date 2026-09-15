@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { approvePostgresQuotation } from '@/lib/postgres-operational';
+import { getPostgresOrderById } from '@/lib/postgres-services';
 import { approveQuotationService, getOrderById } from '@/lib/services';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAuth(['customer', 'admin', 'master_admin']);
     const { id } = await params;
-    const order = getOrderById(id);
+    const order = (await getPostgresOrderById(id)) || getOrderById(id);
     if (!order) {
       throw new Error('Pesanan tidak ditemukan');
     }
