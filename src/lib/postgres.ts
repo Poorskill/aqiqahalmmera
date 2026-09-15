@@ -1,4 +1,9 @@
-import { Pool, type PoolClient, type QueryResultRow } from 'pg';
+import { Pool, types, type PoolClient, type QueryResultRow } from 'pg';
+
+// Return dates/timestamps as plain string to prevent React Error #31
+types.setTypeParser(1082, (val: string) => val);
+types.setTypeParser(1114, (val: string) => val);
+types.setTypeParser(1184, (val: string) => val);
 
 let pool: Pool | null = null;
 
