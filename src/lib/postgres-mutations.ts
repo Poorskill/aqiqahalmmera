@@ -62,16 +62,25 @@ export async function createOfflineManualPayment(orderId: string, adminId: strin
 
 export async function verifyPostgresPayment(paymentId: string, adminId: string, action: 'verify' | 'reject', rejectionReason?: string) {
   return withPostgresTransaction(async client => {
-    const payment = await client.query<{ order_id: string; customer_id: string; status: string; amount: string; vendor_invoice_no: string; quotation_price: string | null }>('SELECT p.order_id, p.customer_id, p.status, p.amount, o.vendor_invoice_no, o.quotation_price FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = $1 FOR UPDATE', [paymentId]);
+    const payment = await client.query<{ order_id: string; customer_id: string; status: string; amount: string }>(
+      'SELECT order_id, customer_id, status, amount FROM payments WHERE id = $1 FOR UPDATE',
+      [paymentId]
+    );
     if (!payment.rowCount) throw new Error('Pembayaran tidak ditemukan.');
     if (payment.rows[0].status !== 'waiting_verification') throw new Error('Pembayaran sudah diproses.');
+
+    const order = await client.query<{ vendor_invoice_no: string; quotation_price: string | null }>(
+      'SELECT vendor_invoice_no, quotation_price FROM orders WHERE id = $1 FOR UPDATE',
+      [payment.rows[0].order_id]
+    );
+
     const nextStatus = action === 'verify' ? 'verified' : 'rejected';
     const now = new Date();
     await client.query('UPDATE payments SET status = $1, verified_by = $2, verified_at = $3, rejection_reason = $4 WHERE id = $5', [nextStatus, adminId, now, action === 'reject' ? rejectionReason || null : null, paymentId]);
     if (action === 'verify') {
       const total = await client.query<{ total: string }>("SELECT COALESCE(SUM(amount), 0)::text AS total FROM payments WHERE order_id=$1 AND status='verified'", [payment.rows[0].order_id]);
       const paid = Number(total.rows[0]?.total || 0);
-      const bill = Number(payment.rows[0].quotation_price || 0);
+      const bill = Number(order.rows[0]?.quotation_price || 0);
       await client.query('UPDATE order_details SET total_bayar=$1, payment_status=$2 WHERE order_id=$3', [paid, bill > 0 && paid >= bill ? 'lunas' : 'dp', payment.rows[0].order_id]);
     }
     await audit(client, adminId, action === 'verify' ? 'VERIFY_PAYMENT' : 'REJECT_PAYMENT', 'payments', paymentId, 'waiting_verification', nextStatus);
@@ -92,9 +101,24 @@ export async function markPostgresDriverArrived(orderId: string, driverId: strin
 
 export async function completePostgresDelivery(orderId: string, driverId: string, deliveryProof: string, deliveryNote?: string) {
   return withPostgresTransaction(async client => {
-    const result = await client.query<{ status: string; arrived_at: string | null; customer_id: string; vendor_invoice_no: string }>('SELECT d.status, d.arrived_at, o.customer_id, o.vendor_invoice_no FROM driver_orders d JOIN orders o ON o.id = d.order_id WHERE d.order_id = $1 AND (d.driver_id = $2 OR d.driver_id IS NULL) FOR UPDATE', [orderId, driverId]);
+    const result = await client.query<{ status: string; arrived_at: string | null }>(
+      'SELECT status, arrived_at FROM driver_orders WHERE order_id = $1 AND (driver_id = $2 OR driver_id IS NULL) FOR UPDATE',
+      [orderId, driverId]
+    );
     if (!result.rowCount) throw new Error('Data pengiriman tidak ditemukan.');
-    const row = result.rows[0];
+
+    const orderRes = await client.query<{ customer_id: string; vendor_invoice_no: string }>(
+      'SELECT customer_id, vendor_invoice_no FROM orders WHERE id = $1 FOR UPDATE',
+      [orderId]
+    );
+    if (!orderRes.rowCount) throw new Error('Data pesanan tidak ditemukan.');
+
+    const row = {
+      status: result.rows[0].status,
+      arrived_at: result.rows[0].arrived_at,
+      customer_id: orderRes.rows[0].customer_id,
+      vendor_invoice_no: orderRes.rows[0].vendor_invoice_no,
+    };
     if (row.status === 'delivered') throw new Error('Pengiriman sudah diselesaikan.');
     if (row.status !== 'on_delivery' || !row.arrived_at) throw new Error('Driver harus menandai tiba terlebih dahulu.');
     if (!deliveryProof) throw new Error('Bukti pengiriman wajib diunggah.');

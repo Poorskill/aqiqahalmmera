@@ -9,26 +9,26 @@ import { uploadFile } from '@/lib/supabase-storage';
 
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
+  let redirectTo = `/driver/orders/${orderId}`;
   try {
     const user = await requireAuth(['driver', 'admin', 'master_admin']);
-    const order = (await getPostgresOrderById(orderId)) || getOrderById(orderId);
+    const formData = await request.formData();
+    const action = (formData.get('action') as string) || (formData.get('status') as string);
+    redirectTo = (formData.get('redirectTo') as string) || redirectTo;
 
+    const order = (await getPostgresOrderById(orderId)) || getOrderById(orderId);
     if (!order) {
-      return NextResponse.redirect(new URL(`/driver/dashboard?error=${encodeURIComponent('Pesanan tidak ditemukan.')}`, request.url), { status: 303 });
+      return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent('Pesanan tidak ditemukan.')}`, request.url), { status: 303 });
     }
 
     const driverOrder = order.driverOrder;
-    if (!driverOrder) {
-      return NextResponse.redirect(new URL(`/driver/dashboard?error=${encodeURIComponent('Data pengiriman pesanan tidak ditemukan.')}`, request.url), { status: 303 });
+    if (!driverOrder && action !== 'start' && action !== 'on_delivery') {
+      return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent('Data pengiriman pesanan tidak ditemukan.')}`, request.url), { status: 303 });
     }
 
-    if (user.role === 'driver' && driverOrder.driverId && driverOrder.driverId !== user.id) {
-      return NextResponse.redirect(new URL(`/driver/dashboard?error=${encodeURIComponent('Akses ditolak: Pengiriman ini ditugaskan ke driver lain.')}`, request.url), { status: 303 });
+    if (user.role === 'driver' && driverOrder?.driverId && driverOrder.driverId !== user.id) {
+      return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent('Akses ditolak: Pengiriman ini ditugaskan ke driver lain.')}`, request.url), { status: 303 });
     }
-
-    const formData = await request.formData();
-    const action = (formData.get('action') as string) || (formData.get('status') as string);
-    const redirectTo = (formData.get('redirectTo') as string) || `/driver/orders/${orderId}`;
 
     if (action === 'start' || action === 'on_delivery') {
       await startPostgresDelivery(orderId, user.id);
@@ -75,6 +75,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
 
     return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent('Aksi tidak dikenali.')}`, request.url), { status: 303 });
   } catch (err: any) {
-    return NextResponse.redirect(new URL(`/driver/orders/${orderId}?error=${encodeURIComponent(err.message || 'Gagal memproses pembaruan pengiriman.')}`, request.url), { status: 303 });
+    return NextResponse.redirect(new URL(`${redirectTo}?error=${encodeURIComponent(err.message || 'Gagal memproses pembaruan pengiriman.')}`, request.url), { status: 303 });
   }
 }
