@@ -1,7 +1,18 @@
 import { queryPostgres } from './postgres';
 import type { OrderWithRelations } from './services';
 
+function serializeValue(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(serializeValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serializeValue(entry)]));
+  }
+  return value;
+}
+
 function mapOrder(row: Record<string, any>, related: Record<string, any>): OrderWithRelations {
+  row = serializeValue(row) as Record<string, any>;
+  related = serializeValue(related) as Record<string, any>;
   const detail = related.detail ? {
     ...related.detail, orderId: related.detail.order_id, parentName: related.detail.parent_name, childName: related.detail.child_name,
     recipientName: related.detail.recipient_name, deliveryDate: related.detail.delivery_date, deliveryTime: related.detail.delivery_time,
