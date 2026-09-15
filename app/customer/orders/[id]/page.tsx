@@ -288,8 +288,25 @@ export default async function CustomerOrderDetailPage({
               </div>
             </div>
 
-            {/* Payment History Table */}
-            <div className="space-y-3">
+             {['admin', 'master_admin'].includes(user.role) && order.orderType === 'MANUAL' && (
+               <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 space-y-4">
+                 <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-900">Catat Pembayaran Offline</h4>
+                 <form action={`/api/admin/orders/${order.id}/offline-payment`} method="POST" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <select name="paymentType" required className="bg-white border border-stone-300 rounded-xl px-4 py-2.5 text-xs">
+                     <option value="dp">DP</option>
+                     <option value="sebagian">Sebagian</option>
+                     <option value="pelunasan">Pelunasan</option>
+                   </select>
+                   <input name="amount" type="number" min="1" required placeholder="Nominal pembayaran" className="bg-white border border-stone-300 rounded-xl px-4 py-2.5 text-xs" />
+                   <input name="paymentDate" type="datetime-local" required defaultValue={new Date().toISOString().slice(0, 16)} className="bg-white border border-stone-300 rounded-xl px-4 py-2.5 text-xs" />
+                   <input name="notes" placeholder="Catatan pembayaran" className="bg-white border border-stone-300 rounded-xl px-4 py-2.5 text-xs" />
+                   <button type="submit" className="md:col-span-2 justify-self-start px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold">Simpan Pembayaran Offline</button>
+                 </form>
+               </div>
+             )}
+
+             {/* Payment History Table */}
+             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-600">Riwayat Pembayaran & Transfer</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">

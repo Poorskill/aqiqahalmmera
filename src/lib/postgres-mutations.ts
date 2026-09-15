@@ -33,6 +33,33 @@ export async function createPostgresPayment(orderId: string, customerId: string,
   });
 }
 
+export async function createOfflineManualPayment(orderId: string, adminId: string, data: { paymentType: string; amount: number; paymentDate: string; paymentMethod: string; notes?: string }) {
+  return withPostgresTransaction(async client => {
+    await client.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'ONLINE'");
+    if (!['dp', 'sebagian', 'pelunasan'].includes(data.paymentType)) throw new Error('Jenis pembayaran tidak valid.');
+    if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('Nominal pembayaran tidak valid.');
+    const result = await client.query<{ customer_id: string; vendor_invoice_no: string; quotation_price: string | null }>(
+      `SELECT o.customer_id, o.vendor_invoice_no, o.quotation_price FROM orders o WHERE o.id = $1 AND o.order_type = 'MANUAL' FOR UPDATE`, [orderId],
+    );
+    if (!result.rowCount) throw new Error('Pesanan manual tidak ditemukan.');
+    if (data.paymentMethod !== 'OFFLINE') throw new Error('Pembayaran offline hanya untuk pesanan manual.');
+    const row = result.rows[0];
+    const now = new Date();
+    const paymentId = `pay-${crypto.randomUUID()}`;
+    await client.query(
+      `INSERT INTO payments (id, order_id, customer_id, payment_type, amount, payment_method, payment_date, proof, status, verified_by, verified_at, notes, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'OFFLINE', $6, NULL, 'verified', $7, $8, $9, $8)`,
+      [paymentId, orderId, row.customer_id, data.paymentType, data.amount, data.paymentDate, adminId, now, data.notes || null],
+    );
+    const total = await client.query<{ total: string }>("SELECT COALESCE(SUM(amount), 0)::text AS total FROM payments WHERE order_id = $1 AND status = 'verified'", [orderId]);
+    const paid = Number(total.rows[0]?.total || 0);
+    const bill = Number(row.quotation_price || 0);
+    await client.query('UPDATE order_details SET total_bayar = $1, payment_status = $2 WHERE order_id = $3', [paid, bill > 0 && paid >= bill ? 'lunas' : paid > 0 ? 'dp' : 'kurang', orderId]);
+    await audit(client, adminId, 'CREATE_OFFLINE_PAYMENT', 'payments', paymentId, undefined, `amount:${data.amount}`);
+    await notify(client, { userId: row.customer_id, category: 'payment', title: 'Pembayaran Dicatat', message: `Pembayaran Rp ${data.amount.toLocaleString('id-ID')} untuk pesanan #${row.vendor_invoice_no} telah dicatat.`, relatedEntityId: orderId });
+  });
+}
+
 export async function verifyPostgresPayment(paymentId: string, adminId: string, action: 'verify' | 'reject', rejectionReason?: string) {
   return withPostgresTransaction(async client => {
     const payment = await client.query<{ order_id: string; customer_id: string; status: string; amount: string; vendor_invoice_no: string; quotation_price: string | null }>('SELECT p.order_id, p.customer_id, p.status, p.amount, o.vendor_invoice_no, o.quotation_price FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = $1 FOR UPDATE', [paymentId]);

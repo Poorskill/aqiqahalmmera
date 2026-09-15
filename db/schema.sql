@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_id TEXT NOT NULL REFERENCES users(id),
   order_date TIMESTAMPTZ NOT NULL,
   jenis_order TEXT NOT NULL DEFAULT 'aqiqah',
+  order_type TEXT NOT NULL DEFAULT 'ONLINE' CHECK (order_type IN ('ONLINE', 'MANUAL')),
   atas_nama TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'waiting_review' CHECK (status IN ('waiting_review', 'quotation_sent', 'quotation_approved', 'preparing', 'slaughtering', 'cooking', 'packaging', 'delivery', 'completed', 'cancelled')),
   quotation_price NUMERIC(14,2),

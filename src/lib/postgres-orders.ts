@@ -47,15 +47,16 @@ export async function createPostgresOrder(customerId: string, data: {
     );
     if (Number(slot.rows[0]?.count || 0) >= 2) throw new Error(`Slot ${data.deliveryTime} untuk tanggal ${data.deliveryDate} sudah penuh (2/2). Silakan pilih waktu lainnya.`);
 
+    await client.query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'ONLINE'");
     const now = new Date();
     const orderId = `ord-${crypto.randomUUID()}`;
     const vendorInvoiceNo = `INV-${now.toISOString().slice(0, 10).replaceAll('-', '')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const first = data.items[0];
     const initialStatus = data.manual ? 'quotation_approved' : 'waiting_review';
     await client.query(
-      `INSERT INTO orders (id, invoice_no, vendor_invoice_no, customer_id, order_date, jenis_order, atas_nama, status, quotation_price, approved_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $5, $5)`,
-      [orderId, data.invoiceNo || vendorInvoiceNo, vendorInvoiceNo, customerId, now, data.jenisOrder || 'aqiqah', data.atasNama, initialStatus, data.totalPelunasan || 0, data.manual ? now : null],
+      `INSERT INTO orders (id, invoice_no, vendor_invoice_no, customer_id, order_date, jenis_order, order_type, atas_nama, status, quotation_price, approved_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $5, $5)`,
+      [orderId, data.invoiceNo || vendorInvoiceNo, vendorInvoiceNo, customerId, now, data.jenisOrder || 'aqiqah', data.manual ? 'MANUAL' : 'ONLINE', data.atasNama, initialStatus, data.totalPelunasan || 0, data.manual ? now : null],
     );
     await client.query(
       `INSERT INTO order_details (id, order_id, parent_name, father_name, mother_name, child_name, recipient_name, address, delivery_date, delivery_time, phone, animal_order, kandang_note, dapur_a_masakan, dapur_a_nasi_box, dapur_a_note, dapur_r_masakan, dapur_r_nasi_box, dapur_r_note, pesan_kandang, pesan_dapur_a, pesan_dapur_r, pesan_driver, uang_saku_driver, pesanan_lainnya, payment_status, total_pelunasan, total_bayar, created_at)

@@ -29,6 +29,7 @@ export interface OrderWithRelations {
   customerId: string;
   orderDate: string;
   jenisOrder: string;
+  orderType?: string;
   atasNama: string;
   status: string;
   quotationPrice: number | null;
@@ -124,8 +125,9 @@ export function updateOrderService(
   orderId: string,
   adminId: string,
   data: {
-    jenisOrder: string;
-    atasNama: string;
+  jenisOrder: string;
+  orderType?: string;
+  atasNama: string;
     fatherName: string;
     motherName: string;
     childName: string;
