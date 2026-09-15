@@ -15,8 +15,14 @@ function mapOrder(row: Record<string, any>, related: Record<string, any>): Order
   related = serializeValue(related) as Record<string, any>;
   const detail = related.detail ? {
     ...related.detail, orderId: related.detail.order_id, parentName: related.detail.parent_name, childName: related.detail.child_name,
-    recipientName: related.detail.recipient_name, deliveryDate: related.detail.delivery_date, deliveryTime: related.detail.delivery_time,
-    totalPelunasan: Number(related.detail.total_pelunasan || 0), totalBayar: Number(related.detail.total_bayar || 0), animalOrder: related.detail.animal_order,
+    fatherName: related.detail.father_name, motherName: related.detail.mother_name, recipientName: related.detail.recipient_name,
+    deliveryDate: related.detail.delivery_date, deliveryTime: related.detail.delivery_time, animalOrder: related.detail.animal_order,
+    kandangNote: related.detail.kandang_note, dapurAMasakan: related.detail.dapur_a_masakan, dapurANasiBox: related.detail.dapur_a_nasi_box,
+    dapurANote: related.detail.dapur_a_note, dapurRMasakan: related.detail.dapur_r_masakan, dapurRNasiBox: related.detail.dapur_r_nasi_box,
+    dapurRNote: related.detail.dapur_r_note, pesanKandang: related.detail.pesan_kandang, pesanDapurA: related.detail.pesan_dapur_a,
+    pesanDapurR: related.detail.pesan_dapur_r, pesanDriver: related.detail.pesan_driver, uangSakuDriver: Number(related.detail.uang_saku_driver || 0),
+    pesananLainnya: related.detail.pesanan_lainnya, paymentStatus: related.detail.payment_status,
+    totalPelunasan: Number(related.detail.total_pelunasan || 0), totalBayar: Number(related.detail.total_bayar || 0),
   } : undefined;
   return {
     id: row.id, invoiceNo: row.invoice_no, vendorInvoiceNo: row.vendor_invoice_no, customerId: row.customer_id, orderDate: row.order_date,
@@ -38,7 +44,9 @@ async function enrich(row: Record<string, any>) {
   ]);
   const driverRow = driver.rows[0];
   const driverOrder = driverRow ? { ...driverRow, orderId: driverRow.order_id, driverId: driverRow.driver_id, deliveryAddress: driverRow.delivery_address, contactPerson: driverRow.contact_person, deliverySchedule: driverRow.delivery_schedule, arrivedAt: driverRow.arrived_at, deliveredAt: driverRow.delivered_at, deliveryProof: driverRow.delivery_proof, deliveryNote: driverRow.delivery_note, receivedAt: driverRow.received_at } : undefined;
-  return mapOrder(row, { customer: customer.rows[0], detail: detail.rows[0], items: items.rows, quotation: quotation.rows[0], kandang: kandang.rows[0], dapur: dapur.rows[0], admin: admin.rows[0], driver: driverOrder, review: review.rows[0] });
+  const kandangOrder = kandang.rows[0] ? { ...kandang.rows[0], orderId: kandang.rows[0].order_id, animalType: kandang.rows[0].animal_type, animalQty: kandang.rows[0].animal_qty, slaughterSchedule: kandang.rows[0].slaughter_schedule, prepStatus: kandang.rows[0].prep_status } : undefined;
+  const dapurOrder = dapur.rows[0] ? { ...dapur.rows[0], orderId: dapur.rows[0].order_id, cookingSchedule: dapur.rows[0].cooking_schedule, kitchenStatus: dapur.rows[0].kitchen_status } : undefined;
+  return mapOrder(row, { customer: customer.rows[0], detail: detail.rows[0], items: items.rows, quotation: quotation.rows[0], kandang: kandangOrder, dapur: dapurOrder, admin: admin.rows[0], driver: driverOrder, review: review.rows[0] });
 }
 
 export async function getPostgresOrderById(orderId: string) {
