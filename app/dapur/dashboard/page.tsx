@@ -6,10 +6,15 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DapurDashboardPage() {
+export default async function DapurDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
   const user = await requireAuth(['dapur', 'admin', 'master_admin']);
+  const qParams = await searchParams;
   const dapurOrders = await getPostgresDapurQueue();
-  const pendingCook = dapurOrders.filter(d => d.kitchenStatus === 'waiting_cook' || d.kitchenStatus === 'cooking');
+  const pendingCook = dapurOrders.filter(d => (d.kitchenStatus === 'waiting_cook' || d.kitchenStatus === 'cooking') && d.orderStatus !== 'completed' && d.orderStatus !== 'cancelled');
 
   return (
     <div className="min-h-screen flex bg-[#faf9f6] text-[#2c1609]">
@@ -19,6 +24,19 @@ export default async function DapurDashboardPage() {
         <AlmeeraTopbar title="Operasional Dapur" subtitle="Manajemen Masakan, Nasi Box & Packing" role={user.role} />
 
         <main className="p-8 space-y-6 max-w-7xl mx-auto w-full">
+          {qParams.error && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">error</span>
+              <span>{qParams.error}</span>
+            </div>
+          )}
+          {qParams.success && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span>{qParams.success}</span>
+            </div>
+          )}
+
           {/* Dapur Action Center */}
           <div className="bg-white border border-stone-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
@@ -44,7 +62,11 @@ export default async function DapurDashboardPage() {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-mono font-bold text-amber-900 bg-white px-2 py-0.5 rounded border border-stone-200">{item.vendorInvoiceNo}</span>
-                        <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold uppercase rounded">{item.kitchenStatus}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${
+                          item.kitchenStatus === 'cooking' ? 'bg-purple-200 text-purple-900' : 'bg-amber-200 text-amber-900'
+                        }`}>
+                          {item.kitchenStatus === 'cooking' ? 'Sedang Dimasak' : 'Menunggu Masak'}
+                        </span>
                       </div>
                       <h5 className="text-xs font-bold text-stone-900">{item.atasNama}</h5>
                       <p className="text-xs text-stone-600 mt-1">{item.menu} ({item.portion})</p>
@@ -54,12 +76,23 @@ export default async function DapurDashboardPage() {
                       <Link href={`/dapur/orders/${item.orderId}`} className="flex-1 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-xs font-semibold text-center transition-all">
                         Detail
                       </Link>
-                      <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="flex-1">
-                        <input type="hidden" name="kitchenStatus" value="packed" />
-                        <button type="submit" className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
-                          Selesai Packing
-                        </button>
-                      </form>
+                      {item.kitchenStatus === 'waiting_cook' ? (
+                        <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="flex-1">
+                          <input type="hidden" name="redirectTo" value="/dapur/dashboard" />
+                          <input type="hidden" name="kitchenStatus" value="cooking" />
+                          <button type="submit" className="w-full py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
+                            Mulai Masak
+                          </button>
+                        </form>
+                      ) : (
+                        <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="flex-1">
+                          <input type="hidden" name="redirectTo" value="/dapur/dashboard" />
+                          <input type="hidden" name="kitchenStatus" value="packed" />
+                          <button type="submit" className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
+                            Selesai Packing
+                          </button>
+                        </form>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -107,7 +140,9 @@ export default async function DapurDashboardPage() {
                             item.kitchenStatus === 'cooking' ? 'bg-purple-100 text-purple-900' :
                             'bg-amber-100 text-amber-900'
                           }`}>
-                            {item.kitchenStatus}
+                            {item.kitchenStatus === 'packed' ? 'Packing Selesai' :
+                             item.kitchenStatus === 'cooking' ? 'Sedang Dimasak' :
+                             'Menunggu Masak'}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-right space-x-2">
@@ -117,18 +152,30 @@ export default async function DapurDashboardPage() {
                           >
                             Detail
                           </Link>
-                          <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="inline-flex">
-                            <input type="hidden" name="kitchenStatus" value="cooking" />
-                            <button type="submit" className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
-                              Mulai Masak
-                            </button>
-                          </form>
-                          <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="inline-flex">
-                            <input type="hidden" name="kitchenStatus" value="packed" />
-                            <button type="submit" className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
-                              Packing Selesai
-                            </button>
-                          </form>
+                          {item.kitchenStatus === 'waiting_cook' && (
+                            <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="inline-flex">
+                              <input type="hidden" name="redirectTo" value="/dapur/dashboard" />
+                              <input type="hidden" name="kitchenStatus" value="cooking" />
+                              <button type="submit" className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
+                                Mulai Masak
+                              </button>
+                            </form>
+                          )}
+                          {item.kitchenStatus === 'cooking' && (
+                            <form action={`/api/dapur/${item.orderId}/update`} method="POST" className="inline-flex">
+                              <input type="hidden" name="redirectTo" value="/dapur/dashboard" />
+                              <input type="hidden" name="kitchenStatus" value="packed" />
+                              <button type="submit" className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all">
+                                Packing Selesai
+                              </button>
+                            </form>
+                          )}
+                          {item.kitchenStatus === 'packed' && (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                              <span className="material-symbols-outlined text-sm">check_circle</span>
+                              Siap Kirim
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))

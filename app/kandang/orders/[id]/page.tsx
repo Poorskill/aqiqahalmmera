@@ -103,6 +103,7 @@ export default async function KandangOrderDetailPage({
               UPDATE STATUS & CATATAN PERSIAPAN KANDANG
             </h4>
             <form action={`/api/kandang/${order.id}/update`} method="POST" className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <input type="hidden" name="redirectTo" value={`/kandang/orders/${order.id}`} />
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-amber-900 mb-1">Status Persiapan</label>
                 <select name="prepStatus" defaultValue={kandang.prepStatus} className="w-full brutalist-input text-sm font-medium bg-white">

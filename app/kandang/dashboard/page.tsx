@@ -6,8 +6,13 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
-export default async function KandangDashboardPage() {
-  const user = await requireAuth(['kandang', 'admin']);
+export default async function KandangDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
+  const user = await requireAuth(['kandang', 'admin', 'master_admin']);
+  const qParams = await searchParams;
   const kandangOrders = await getPostgresKandangQueue();
 
   return (
@@ -18,6 +23,19 @@ export default async function KandangDashboardPage() {
         <AlmeeraTopbar title="OPERASIONAL KANDANG" subtitle="MANAJEMEN HEWAN AQIQAH & PENYEMBELIHAN" role={user.role} />
 
         <main className="p-8 space-y-6">
+          {qParams.error && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">error</span>
+              <span>{qParams.error}</span>
+            </div>
+          )}
+          {qParams.success && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              <span>{qParams.success}</span>
+            </div>
+          )}
+
           <div className="brutalist-card p-6 bg-white space-y-4">
             <h4 className="text-sm font-bold uppercase tracking-widest text-[#775847] border-b-2 border-[#775847] pb-3">
               DAFTAR TUGAS KANDANG & PERSIAPAN ({kandangOrders.length})
@@ -59,12 +77,14 @@ export default async function KandangDashboardPage() {
                           Detail
                         </Link>
                         <form action={`/api/kandang/${item.orderId}/update`} method="POST" className="inline-flex gap-2">
+                          <input type="hidden" name="redirectTo" value="/kandang/dashboard" />
                           <input type="hidden" name="prepStatus" value="ready" />
                           <button type="submit" className="px-2.5 py-1 bg-[#f39c0d] text-[#2c1609] brutalist-btn text-xs font-bold">
                             Siap
                           </button>
                         </form>
                         <form action={`/api/kandang/${item.orderId}/update`} method="POST" className="inline-flex gap-2">
+                          <input type="hidden" name="redirectTo" value="/kandang/dashboard" />
                           <input type="hidden" name="prepStatus" value="slaughtered" />
                           <button type="submit" className="px-2.5 py-1 bg-emerald-600 text-white brutalist-btn text-xs font-bold">
                             Sembelih

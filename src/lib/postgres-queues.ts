@@ -6,8 +6,22 @@ export async function getPostgresKandangQueue() {
 }
 
 export async function getPostgresDapurQueue() {
-  const result = await queryPostgres(`SELECT d.id,d.order_id,d.menu,d.portion,d.cooking_schedule,d.notes,d.kitchen_status,o.vendor_invoice_no,o.atas_nama,o.status AS order_status FROM dapur_orders d JOIN orders o ON o.id=d.order_id ORDER BY d.created_at DESC`);
-  return result.rows.map(row => ({ ...row, id: row.id, orderId: row.order_id, menu: row.menu, portion: row.portion, cookingSchedule: row.cooking_schedule, kitchenStatus: row.kitchen_status, vendorInvoiceNo: row.vendor_invoice_no, atasNama: row.atas_nama, orderStatus: row.order_status }));
+  const result = await queryPostgres(`
+    SELECT COALESCE(d.id, 'dap-' || o.id) AS id,
+           o.id AS order_id,
+           COALESCE(d.menu, (COALESCE(od.dapur_a_masakan, 'Gulai & Sate') || ' / ' || COALESCE(od.dapur_a_nasi_box, 'Nasi Box'))) AS menu,
+           COALESCE(d.portion, 'Sesuai pesanan') AS portion,
+           COALESCE(d.cooking_schedule, (od.delivery_date || ' 07:30 WIB')) AS cooking_schedule,
+           COALESCE(d.notes, od.dapur_a_note) AS notes,
+           COALESCE(d.kitchen_status, CASE WHEN o.status = 'cooking' THEN 'cooking' WHEN o.status = 'packaging' THEN 'packed' ELSE 'waiting_cook' END) AS kitchen_status,
+           o.vendor_invoice_no, o.atas_nama, o.status AS order_status
+    FROM orders o
+    JOIN order_details od ON od.order_id = o.id
+    LEFT JOIN dapur_orders d ON d.order_id = o.id
+    WHERE o.status IN ('quotation_approved', 'preparing', 'slaughtering', 'cooking', 'packaging', 'delivery', 'completed')
+    ORDER BY COALESCE(d.created_at, o.created_at) DESC
+  `);
+  return result.rows.map(row => ({ ...row, id: row.id, orderId: row.order_id, menu: row.menu, portion: row.portion, cookingSchedule: row.cooking_schedule, kitchenStatus: row.kitchen_status, notes: row.notes, vendorInvoiceNo: row.vendor_invoice_no, atasNama: row.atas_nama, orderStatus: row.order_status }));
 }
 
 export async function getPostgresDriverQueue(driverId?: string) {

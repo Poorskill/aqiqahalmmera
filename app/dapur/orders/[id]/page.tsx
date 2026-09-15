@@ -111,6 +111,7 @@ export default async function DapurOrderDetailPage({
               UPDATE STATUS & CATATAN PRODUKSI DAPUR
             </h4>
             <form action={`/api/dapur/${order.id}/update`} method="POST" className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <input type="hidden" name="redirectTo" value={`/dapur/orders/${order.id}`} />
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-purple-900 mb-1">Status Dapur</label>
                 <select name="kitchenStatus" defaultValue={dapur.kitchenStatus} className="w-full brutalist-input text-sm font-medium bg-white">

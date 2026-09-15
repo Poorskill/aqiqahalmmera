@@ -30,22 +30,57 @@ export async function approvePostgresQuotation(orderId: string) {
 
 export async function updatePostgresKandang(orderId: string, status: string, notes?: string) {
   return withPostgresTransaction(async client => {
-    const gate = await client.query<{ payment_status: string }>('SELECT payment_status FROM order_details WHERE order_id=$1 FOR UPDATE', [orderId]);
-    if (!gate.rowCount) throw new Error('Detail pesanan tidak ditemukan.');
-    if (gate.rows[0].payment_status !== 'lunas') throw new Error('Pesanan masih DP/booking. Kandang belum dapat memproses sebelum pelunasan.');
+    const order = await client.query<{ customer_id: string; vendor_invoice_no: string; status: string }>('SELECT customer_id, vendor_invoice_no, status FROM orders WHERE id=$1 FOR UPDATE', [orderId]);
+    if (!order.rowCount) throw new Error('Pesanan tidak ditemukan.');
+    if (order.rows[0].status === 'cancelled') throw new Error('Pesanan sudah dibatalkan.');
+
+    const existing = await client.query('SELECT id, prep_status FROM kandang_orders WHERE order_id = $1', [orderId]);
+    if (existing.rowCount) {
+      await client.query('UPDATE kandang_orders SET prep_status=$1, notes=COALESCE($2, notes) WHERE order_id=$3', [status, notes || null, orderId]);
+    } else {
+      const detail = await client.query('SELECT animal_order, kandang_note, delivery_date FROM order_details WHERE order_id = $1', [orderId]);
+      const row = detail.rows[0];
+      await client.query(
+        `INSERT INTO kandang_orders (id, order_id, animal_type, animal_qty, slaughter_schedule, notes, prep_status, created_at)
+         VALUES ($1, $2, $3, 1, $4, $5, $6, $7)`,
+        [`kan-${orderId}`, orderId, row?.animal_order || 'Kambing', `${row?.delivery_date || 'Segera'} 06:00 WIB`, notes || row?.kandang_note || null, status, new Date()]
+      );
+    }
+
     const orderStatus = status === 'ready' ? 'preparing' : status === 'slaughtered' ? 'slaughtering' : null;
-    await client.query('UPDATE kandang_orders SET prep_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]);
-    if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
+    if (orderStatus) await client.query('UPDATE orders SET status=$1, updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
   });
 }
 
 export async function updatePostgresDapur(orderId: string, status: string, notes?: string) {
   return withPostgresTransaction(async client => {
-    const gate = await client.query<{ payment_status: string }>('SELECT payment_status FROM order_details WHERE order_id=$1 FOR UPDATE', [orderId]);
-    if (!gate.rowCount) throw new Error('Detail pesanan tidak ditemukan.');
-    if (gate.rows[0].payment_status !== 'lunas') throw new Error('Pesanan masih DP/booking. Dapur belum dapat memproses sebelum pelunasan.');
-    const orderStatus = status === 'cooking' ? 'cooking' : status === 'packed' ? 'packaging' : null;
-    await client.query('UPDATE dapur_orders SET kitchen_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]);
-    if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
+    const order = await client.query<{ customer_id: string; vendor_invoice_no: string; status: string }>('SELECT customer_id, vendor_invoice_no, status FROM orders WHERE id=$1 FOR UPDATE', [orderId]);
+    if (!order.rowCount) throw new Error('Pesanan tidak ditemukan.');
+    if (order.rows[0].status === 'cancelled') throw new Error('Pesanan sudah dibatalkan.');
+
+    const existing = await client.query('SELECT id, kitchen_status FROM dapur_orders WHERE order_id = $1', [orderId]);
+    if (existing.rowCount) {
+      await client.query('UPDATE dapur_orders SET kitchen_status=$1, notes=COALESCE($2, notes) WHERE order_id=$3', [status, notes || null, orderId]);
+    } else {
+      const detail = await client.query('SELECT dapur_a_masakan, dapur_a_nasi_box, dapur_a_note, delivery_date FROM order_details WHERE order_id = $1', [orderId]);
+      const row = detail.rows[0];
+      const menu = `${row?.dapur_a_masakan || 'Gulai & Sate'} / ${row?.dapur_a_nasi_box || 'Nasi Box'}`;
+      const schedule = `${row?.delivery_date || 'Segera'} 07:30 WIB`;
+      await client.query(
+        `INSERT INTO dapur_orders (id, order_id, menu, portion, cooking_schedule, notes, kitchen_status, created_at)
+         VALUES ($1, $2, $3, 'Sesuai pesanan', $4, $5, $6, $7)`,
+        [`dap-${orderId}`, orderId, menu, schedule, notes || row?.dapur_a_note || null, status, new Date()]
+      );
+    }
+
+    const orderStatus = status === 'cooking' ? 'cooking' : status === 'packed' ? 'packaging' : status === 'waiting_cook' && ['cooking', 'packaging'].includes(order.rows[0].status) ? 'slaughtering' : null;
+    if (orderStatus) await client.query('UPDATE orders SET status=$1, updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
+
+    const statusText = status === 'cooking' ? 'sedang dimasak' : status === 'packed' ? 'selesai dimasak dan dipacking' : 'menunggu antrean masak';
+    await client.query(
+      `INSERT INTO notifications (id, user_id, category, title, message, priority, action_url, related_entity_id, created_at)
+       VALUES ($1, $2, 'pesanan', 'Pembaruan Produksi Dapur', $3, 'medium', $4, $5, $6)`,
+      [`not-${crypto.randomUUID()}`, order.rows[0].customer_id, `Pesanan #${order.rows[0].vendor_invoice_no} ${statusText}.`, `/customer/orders/${orderId}`, orderId, new Date()]
+    );
   });
 }
