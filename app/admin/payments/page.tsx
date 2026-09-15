@@ -4,7 +4,6 @@ import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
 import Link from 'next/link';
 import { PaymentActionCell } from './PaymentActionCell';
-import { resolveFileUrl } from '@/lib/supabase-storage';
 
 export const dynamic = 'force-dynamic';
 

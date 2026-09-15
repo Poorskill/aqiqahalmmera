@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getPostgresNotifications, getPostgresUnreadNotificationCount } from '@/lib/postgres-rbac';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const user = await requireAuth(['customer']);
     const notifications = await getPostgresNotifications(user.id);

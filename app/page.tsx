@@ -7,7 +7,7 @@ export default async function HomePage() {
     redirect('/login');
   }
 
-  if (user.role === 'admin') redirect('/admin/dashboard');
+  if (user.role === 'admin' || user.role === 'master_admin') redirect('/admin/dashboard');
   if (user.role === 'kandang') redirect('/kandang/dashboard');
   if (user.role === 'dapur') redirect('/dapur/dashboard');
   if (user.role === 'driver') redirect('/driver/dashboard');

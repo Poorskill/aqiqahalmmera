@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { updatePostgresProfile } from '@/lib/postgres-admin';
-import { updateCustomerProfileService } from '@/lib/services';
 import path from 'node:path';
 import { uploadFile, publicFileUrl } from '@/lib/supabase-storage';
 

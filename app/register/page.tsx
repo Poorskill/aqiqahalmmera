@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { RegisterForm } from './RegisterForm';
 
 export const dynamic = 'force-dynamic';

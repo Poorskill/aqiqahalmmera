@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { startPostgresDelivery } from '@/lib/postgres-delivery';
 import { getPostgresOrderById } from '@/lib/postgres-services';
 import { markPostgresDriverArrived, completePostgresDelivery } from '@/lib/postgres-mutations';
-import { updateDriverStatusService, markDriverArrived, completeDeliveryService, getOrderById } from '@/lib/services';
+import { completeDeliveryService, getOrderById } from '@/lib/services';
 import path from 'node:path';
 import { uploadFile } from '@/lib/supabase-storage';
 

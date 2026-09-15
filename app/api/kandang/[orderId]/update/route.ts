@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { updatePostgresKandang } from '@/lib/postgres-operational';
-import { updateKandangStatusService } from '@/lib/services';
 
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   try {

@@ -6,7 +6,7 @@ import Link from 'next/link';
 export function LoginForm({ initialError }: { initialError?: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(initialError);
+  const [error] = useState(initialError);
 
   return (
     <div className="space-y-4">

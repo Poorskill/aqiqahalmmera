@@ -3,7 +3,6 @@ import { getPostgresOrderById } from '@/lib/postgres-services';
 import { getOrderById } from '@/lib/services';
 import { AlmeeraSidebar } from '@/components/layout/AlmeeraSidebar';
 import { AlmeeraTopbar } from '@/components/layout/AlmeeraTopbar';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
