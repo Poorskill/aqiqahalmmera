@@ -11,13 +11,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const kitchenStatus = formData.get('kitchenStatus') as string;
     const notes = formData.get('notes') as string;
 
-    try {
-      await updatePostgresDapur(orderId, kitchenStatus, notes);
-    } catch {
-      updateDapurStatusService(orderId, kitchenStatus, notes);
-    }
+    await updatePostgresDapur(orderId, kitchenStatus, notes);
     return NextResponse.redirect(new URL(`/dapur/orders/${orderId}?success=Status dapur berhasil diperbarui`, request.url));
   } catch (err: any) {
-    return NextResponse.redirect(new URL(`/dapur/dashboard?error=Gagal update status dapur`, request.url));
+    return NextResponse.redirect(new URL(`/dapur/dashboard?error=${encodeURIComponent(err.message || 'Gagal update status dapur')}`, request.url));
   }
 }

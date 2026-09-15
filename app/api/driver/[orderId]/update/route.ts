@@ -31,20 +31,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     const redirectTo = (formData.get('redirectTo') as string) || `/driver/orders/${orderId}`;
 
     if (action === 'start' || action === 'on_delivery') {
-      try {
-        await startPostgresDelivery(orderId, user.id);
-      } catch {
-        updateDriverStatusService(orderId, 'on_delivery');
-      }
+      await startPostgresDelivery(orderId, user.id);
       return NextResponse.redirect(new URL(`${redirectTo}?success=${encodeURIComponent('Status diperbarui: Pengiriman sedang berjalan.')}`, request.url), { status: 303 });
     }
 
     if (action === 'arrived') {
-      try {
-        await markPostgresDriverArrived(orderId, user.id);
-      } catch {
-        markDriverArrived(orderId, user.id);
-      }
+      await markPostgresDriverArrived(orderId, user.id);
       return NextResponse.redirect(new URL(`${redirectTo}?success=${encodeURIComponent('Berhasil menandai tiba di lokasi pengiriman.')}`, request.url), { status: 303 });
     }
 

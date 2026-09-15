@@ -29,9 +29,23 @@ export async function approvePostgresQuotation(orderId: string) {
 }
 
 export async function updatePostgresKandang(orderId: string, status: string, notes?: string) {
-  return withPostgresTransaction(async client => { const orderStatus = status === 'ready' ? 'preparing' : status === 'slaughtered' ? 'slaughtering' : null; await client.query('UPDATE kandang_orders SET prep_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]); if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]); });
+  return withPostgresTransaction(async client => {
+    const gate = await client.query<{ payment_status: string }>('SELECT payment_status FROM order_details WHERE order_id=$1 FOR UPDATE', [orderId]);
+    if (!gate.rowCount) throw new Error('Detail pesanan tidak ditemukan.');
+    if (gate.rows[0].payment_status !== 'lunas') throw new Error('Pesanan masih DP/booking. Kandang belum dapat memproses sebelum pelunasan.');
+    const orderStatus = status === 'ready' ? 'preparing' : status === 'slaughtered' ? 'slaughtering' : null;
+    await client.query('UPDATE kandang_orders SET prep_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]);
+    if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
+  });
 }
 
 export async function updatePostgresDapur(orderId: string, status: string, notes?: string) {
-  return withPostgresTransaction(async client => { const orderStatus = status === 'cooking' ? 'cooking' : status === 'packed' ? 'packaging' : null; await client.query('UPDATE dapur_orders SET kitchen_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]); if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]); });
+  return withPostgresTransaction(async client => {
+    const gate = await client.query<{ payment_status: string }>('SELECT payment_status FROM order_details WHERE order_id=$1 FOR UPDATE', [orderId]);
+    if (!gate.rowCount) throw new Error('Detail pesanan tidak ditemukan.');
+    if (gate.rows[0].payment_status !== 'lunas') throw new Error('Pesanan masih DP/booking. Dapur belum dapat memproses sebelum pelunasan.');
+    const orderStatus = status === 'cooking' ? 'cooking' : status === 'packed' ? 'packaging' : null;
+    await client.query('UPDATE dapur_orders SET kitchen_status=$1,notes=COALESCE($2,notes) WHERE order_id=$3', [status, notes || null, orderId]);
+    if (orderStatus) await client.query('UPDATE orders SET status=$1,updated_at=$2 WHERE id=$3', [orderStatus, new Date(), orderId]);
+  });
 }

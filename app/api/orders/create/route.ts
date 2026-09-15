@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       throw new Error('Gagal membuat pesanan');
     }
 
-    const redirectPath = user.role === 'admin' ? `/admin/orders/${order.id}` : `/customer/orders/${order.id}`;
+    const redirectPath = user.role === 'admin' ? `/admin/dashboard?success=Pesanan manual berhasil disimpan` : `/customer/orders/${order.id}`;
     return NextResponse.redirect(new URL(redirectPath, request.url));
   } catch (err: any) {
     const userRole = 'customer'; // default fallback for error redirect
