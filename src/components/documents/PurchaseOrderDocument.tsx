@@ -74,7 +74,9 @@ export function PurchaseOrderDocument({ type, order }: POProps) {
           <div className="flex"><span className="w-32 font-bold">Tanggal Cetak</span><span className="mr-2">:</span><span>{new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</span></div>
           <div className="flex"><span className="w-32 font-bold">Jenis Order</span><span className="mr-2">:</span><span className="uppercase font-bold">{order.jenisOrder}</span></div>
           <div className="flex"><span className="w-32 font-bold">Status Pesanan</span><span className="mr-2">:</span><span className="uppercase font-bold">{order.status}</span></div>
-          <div className="flex"><span className="w-32 font-bold">Uang Saku Driver</span><span className="mr-2">:</span><span className="font-mono font-bold text-gray-900">Rp {(details.uangSakuDriver || 50000).toLocaleString('id-ID')}</span></div>
+          {type === 'driver' && (
+            <div className="flex"><span className="w-32 font-bold">Uang Saku Driver</span><span className="mr-2">:</span><span className="font-mono font-bold text-gray-900">Rp {(details.uangSakuDriver || 50000).toLocaleString('id-ID')}</span></div>
+          )}
         </div>
       </div>
 
