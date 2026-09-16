@@ -26,7 +26,7 @@ export default async function PoDapurAPage({ params }: { params: Promise<{ id: s
         <PrintButton label="Cetak / Print PO Dapur A" />
       </div>
 
-      <PurchaseOrderDocument type="dapur-a" order={order} />
+      <PurchaseOrderDocument type="dapur-a" order={order} pageNumber={1} totalPages={1} />
     </div>
   );
 }

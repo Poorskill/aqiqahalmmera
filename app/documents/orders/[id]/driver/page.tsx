@@ -26,7 +26,7 @@ export default async function PoDriverPage({ params }: { params: Promise<{ id: s
         <PrintButton label="Cetak / Print PO Driver" />
       </div>
 
-      <PurchaseOrderDocument type="driver" order={order} />
+      <PurchaseOrderDocument type="driver" order={order} pageNumber={1} totalPages={1} />
     </div>
   );
 }

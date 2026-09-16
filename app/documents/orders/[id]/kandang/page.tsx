@@ -26,7 +26,7 @@ export default async function PoKandangPage({ params }: { params: Promise<{ id: 
         <PrintButton label="Cetak / Print PO Kandang" />
       </div>
 
-      <PurchaseOrderDocument type="kandang" order={order} />
+      <PurchaseOrderDocument type="kandang" order={order} pageNumber={1} totalPages={1} />
     </div>
   );
 }

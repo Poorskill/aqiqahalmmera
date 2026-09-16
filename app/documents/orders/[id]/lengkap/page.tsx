@@ -27,19 +27,19 @@ export default async function PoLengkapPage({ params }: { params: Promise<{ id: 
       </div>
 
       <div style={{ pageBreakAfter: 'always' }} className="print:break-after-page">
-        <PurchaseOrderDocument type="kandang" order={order} />
+        <PurchaseOrderDocument type="kandang" order={order} pageNumber={1} totalPages={4} />
       </div>
 
       <div style={{ pageBreakAfter: 'always' }} className="print:break-after-page">
-        <PurchaseOrderDocument type="dapur-a" order={order} />
+        <PurchaseOrderDocument type="dapur-a" order={order} pageNumber={2} totalPages={4} />
       </div>
 
       <div style={{ pageBreakAfter: 'always' }} className="print:break-after-page">
-        <PurchaseOrderDocument type="dapur-r" order={order} />
+        <PurchaseOrderDocument type="dapur-r" order={order} pageNumber={3} totalPages={4} />
       </div>
 
       <div>
-        <PurchaseOrderDocument type="driver" order={order} />
+        <PurchaseOrderDocument type="driver" order={order} pageNumber={4} totalPages={4} />
       </div>
     </div>
   );
