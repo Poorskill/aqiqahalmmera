@@ -44,7 +44,7 @@ async function enrich(row: Record<string, any>) {
     queryPostgres('SELECT name,email,phone FROM users WHERE id=$1', [row.customer_id]), queryPostgres('SELECT * FROM order_details WHERE order_id=$1', [id]),
     queryPostgres('SELECT * FROM order_items WHERE order_id=$1 ORDER BY created_at', [id]), queryPostgres('SELECT * FROM quotations WHERE order_id=$1', [id]),
     queryPostgres('SELECT * FROM kandang_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM dapur_orders WHERE order_id=$1', [id]),
-    queryPostgres('SELECT * FROM admin_orders WHERE order_id=$1', [id]), queryPostgres('SELECT do.*, u.name AS driver_name FROM driver_orders do LEFT JOIN users u ON u.id = do.driver_id WHERE do.order_id=$1', [id]), queryPostgres('SELECT * FROM reviews WHERE order_id=$1', [id]),
+    queryPostgres('SELECT * FROM admin_orders WHERE order_id=$1', [id]), queryPostgres('SELECT d.*, u.name AS driver_name FROM driver_orders d LEFT JOIN users u ON u.id = d.driver_id WHERE d.order_id=$1', [id]), queryPostgres('SELECT * FROM reviews WHERE order_id=$1', [id]),
   ]);
   const driverRow = driver.rows[0];
   const driverOrder = driverRow ? { ...driverRow, orderId: driverRow.order_id, driverId: driverRow.driver_id, driverName: driverRow.driver_name, deliveryAddress: driverRow.delivery_address, contactPerson: driverRow.contact_person, deliverySchedule: driverRow.delivery_schedule, arrivedAt: driverRow.arrived_at, deliveredAt: driverRow.delivered_at, deliveryProof: driverRow.delivery_proof, deliveryNote: driverRow.delivery_note, receivedAt: driverRow.received_at } : undefined;
