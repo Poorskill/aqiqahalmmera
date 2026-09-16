@@ -37,16 +37,23 @@ export function PurchaseOrderDocument({ type, order }: POProps) {
   return (
     <div className="max-w-[210mm] mx-auto bg-white text-black p-8 md:p-12 print:p-0 font-sans border border-gray-300 print:border-none shadow-sm print:shadow-none">
       {/* Company Header */}
-      <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight uppercase">AQIQAH ALMEERA</h1>
-          <p className="text-xs font-semibold text-gray-700 uppercase">Layanan Aqiqah & Catering Profesional</p>
-          <p className="text-xs text-gray-600 mt-1">
-            Jl. Flores No.28B, Rawapasung, Sidanegara, Kec. Cilacap Tengah, Kab. Cilacap, Jawa Tengah
-          </p>
-          <p className="text-xs text-gray-600">Telp / WA: 0812-3456-7890 | Email: info@aqiqahalmeera.com</p>
+      <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <img
+            src="/logo-almeera.png"
+            alt="Logo Aqiqah Almeera"
+            className="h-16 w-auto object-contain shrink-0"
+          />
+          <div>
+            <h1 className="text-xl font-bold tracking-tight uppercase">AQIQAH ALMEERA</h1>
+            <p className="text-xs font-semibold text-gray-700 uppercase">Layanan Aqiqah &amp; Catering Profesional</p>
+            <p className="text-xs text-gray-600 mt-1">
+              Jl. Flores No.28B, Rawapasung, Sidanegara, Kec. Cilacap Tengah, Kab. Cilacap, Jawa Tengah
+            </p>
+            <p className="text-xs text-gray-600">Telp / WA: 0812-3456-7890 | Email: info@aqiqahalmeera.com</p>
+          </div>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <div className="inline-block border-2 border-black px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider bg-gray-50 print:bg-white">
             DOKUMEN INTERNAL
           </div>
