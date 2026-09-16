@@ -8,9 +8,10 @@ export function PrintButton({ label }: { label: string }) {
           window.print();
         }
       }}
-      className="px-6 py-3 bg-[#f39c0d] text-[#2c1609] brutalist-btn text-xs font-bold uppercase"
+      className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
     >
-      🖨️ {label}
+      <span className="material-symbols-outlined text-base">print</span>
+      <span>{label}</span>
     </button>
   );
 }
