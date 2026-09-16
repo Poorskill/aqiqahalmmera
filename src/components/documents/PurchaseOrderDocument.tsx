@@ -152,15 +152,6 @@ export function PurchaseOrderDocument({ type, order, pageNumber = 1, totalPages 
 
             <span className="text-stone-500 font-medium">Terakhir Update</span>
             <span className="col-span-2 text-stone-700">{formatDateTimeIndo(order.updatedAt || order.createdAt)}</span>
-
-            {type === 'driver' && (
-              <>
-                <span className="text-stone-500 font-medium">Uang Saku Driver</span>
-                <span className="col-span-2 font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block w-fit">
-                  {formatRupiah(details.uangSakuDriver || 50000)}
-                </span>
-              </>
-            )}
           </div>
         </div>
 
