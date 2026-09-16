@@ -17,6 +17,7 @@ export function AlmeeraSidebar({ role, userName }: SidebarProps) {
         return [
           { href: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
           { href: '/admin/orders', label: 'Manajemen Pesanan', icon: 'receipt_long' },
+          { href: '/admin/orders/history', label: 'History Pesanan', icon: 'inventory_2' },
           { href: '/admin/payments', label: 'Manajemen Pembayaran', icon: 'payments' },
           { href: '/admin/orders/new', label: 'Buat Pesanan Manual', icon: 'post_add' },
           { href: '/admin/calendar', label: 'Kalender Operasional', icon: 'calendar_month' },
@@ -30,6 +31,7 @@ export function AlmeeraSidebar({ role, userName }: SidebarProps) {
         return [
           { href: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
           { href: '/admin/orders', label: 'Manajemen Pesanan', icon: 'receipt_long' },
+          { href: '/admin/orders/history', label: 'History Pesanan', icon: 'inventory_2' },
           { href: '/admin/payments', label: 'Manajemen Pembayaran', icon: 'payments' },
           { href: '/admin/orders/new', label: 'Buat Pesanan Manual', icon: 'post_add' },
           { href: '/admin/calendar', label: 'Kalender Operasional', icon: 'calendar_month' },

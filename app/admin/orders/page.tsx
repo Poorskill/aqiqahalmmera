@@ -15,9 +15,12 @@ export default async function AdminOrdersPage({
 }) {
   const user = await requireAuth(['admin', 'master_admin']);
   const params = await searchParams;
-  let orders = await getPostgresOrders({ search: params.search, status: params.status });
+  let orders = await getPostgresOrders({ search: params.search, status: params.status, excludeStatuses: params.status ? undefined : ['completed'] });
   if (!orders || orders.length === 0) {
     orders = getAllOrders({ search: params.search, status: params.status });
+    if (!params.status) {
+      orders = orders.filter(o => o.status !== 'completed');
+    }
   }
 
   return (
@@ -27,7 +30,7 @@ export default async function AdminOrdersPage({
       <div className="flex-1 flex flex-col min-w-0">
         <AlmeeraTopbar
           title="MANAJEMEN PESANAN"
-          subtitle="SEMUA PESANAN AQIQAH ALMEERA CILACAP"
+          subtitle="PESANAN AKTIF AQIQAH ALMEERA CILACAP"
           role={user.role}
         />
 

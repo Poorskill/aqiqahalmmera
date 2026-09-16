@@ -44,10 +44,10 @@ async function enrich(row: Record<string, any>) {
     queryPostgres('SELECT name,email,phone FROM users WHERE id=$1', [row.customer_id]), queryPostgres('SELECT * FROM order_details WHERE order_id=$1', [id]),
     queryPostgres('SELECT * FROM order_items WHERE order_id=$1 ORDER BY created_at', [id]), queryPostgres('SELECT * FROM quotations WHERE order_id=$1', [id]),
     queryPostgres('SELECT * FROM kandang_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM dapur_orders WHERE order_id=$1', [id]),
-    queryPostgres('SELECT * FROM admin_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM driver_orders WHERE order_id=$1', [id]), queryPostgres('SELECT * FROM reviews WHERE order_id=$1', [id]),
+    queryPostgres('SELECT * FROM admin_orders WHERE order_id=$1', [id]), queryPostgres('SELECT do.*, u.name AS driver_name FROM driver_orders do LEFT JOIN users u ON u.id = do.driver_id WHERE do.order_id=$1', [id]), queryPostgres('SELECT * FROM reviews WHERE order_id=$1', [id]),
   ]);
   const driverRow = driver.rows[0];
-  const driverOrder = driverRow ? { ...driverRow, orderId: driverRow.order_id, driverId: driverRow.driver_id, deliveryAddress: driverRow.delivery_address, contactPerson: driverRow.contact_person, deliverySchedule: driverRow.delivery_schedule, arrivedAt: driverRow.arrived_at, deliveredAt: driverRow.delivered_at, deliveryProof: driverRow.delivery_proof, deliveryNote: driverRow.delivery_note, receivedAt: driverRow.received_at } : undefined;
+  const driverOrder = driverRow ? { ...driverRow, orderId: driverRow.order_id, driverId: driverRow.driver_id, driverName: driverRow.driver_name, deliveryAddress: driverRow.delivery_address, contactPerson: driverRow.contact_person, deliverySchedule: driverRow.delivery_schedule, arrivedAt: driverRow.arrived_at, deliveredAt: driverRow.delivered_at, deliveryProof: driverRow.delivery_proof, deliveryNote: driverRow.delivery_note, receivedAt: driverRow.received_at } : undefined;
   const kandangOrder = kandang.rows[0] ? { ...kandang.rows[0], orderId: kandang.rows[0].order_id, animalType: kandang.rows[0].animal_type, animalQty: kandang.rows[0].animal_qty, slaughterSchedule: kandang.rows[0].slaughter_schedule, prepStatus: kandang.rows[0].prep_status } : undefined;
   const dapurOrder = dapur.rows[0] ? { ...dapur.rows[0], orderId: dapur.rows[0].order_id, cookingSchedule: dapur.rows[0].cooking_schedule, kitchenStatus: dapur.rows[0].kitchen_status } : undefined;
   return mapOrder(row, { customer: customer.rows[0], detail: detail.rows[0], items: items.rows, quotation: quotation.rows[0], kandang: kandangOrder, dapur: dapurOrder, admin: admin.rows[0], driver: driverOrder, review: review.rows[0] });
@@ -58,10 +58,14 @@ export async function getPostgresOrderById(orderId: string) {
   return result.rows[0] ? enrich(result.rows[0]) : null;
 }
 
-export async function getPostgresOrders(filters?: { customerId?: string; status?: string; search?: string }) {
+export async function getPostgresOrders(filters?: { customerId?: string; status?: string; excludeStatuses?: string[]; search?: string }) {
   const values: string[] = []; const conditions = ['1=1'];
   if (filters?.customerId) { values.push(filters.customerId); conditions.push(`customer_id=$${values.length}`); }
   if (filters?.status) { values.push(filters.status); conditions.push(`status=$${values.length}`); }
+  if (filters?.excludeStatuses && filters.excludeStatuses.length > 0) {
+    const placeholders = filters.excludeStatuses.map(s => { values.push(s); return `$${values.length}`; }).join(',');
+    conditions.push(`status NOT IN (${placeholders})`);
+  }
   if (filters?.search) { values.push(`%${filters.search}%`); conditions.push(`(invoice_no ILIKE $${values.length} OR vendor_invoice_no ILIKE $${values.length} OR atas_nama ILIKE $${values.length})`); }
   const result = await queryPostgres(`SELECT * FROM orders WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`, values);
   return Promise.all(result.rows.map(enrich));
